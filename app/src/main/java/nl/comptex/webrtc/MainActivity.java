@@ -8,8 +8,6 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera2Enumerator;
 import org.webrtc.CameraEnumerator;
@@ -18,13 +16,11 @@ import org.webrtc.DefaultVideoDecoderFactory;
 import org.webrtc.DefaultVideoEncoderFactory;
 import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
-import org.webrtc.MediaConstraints;
 import org.webrtc.MediaStream;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.PeerConnectionFactory.InitializationOptions;
 import org.webrtc.RtpReceiver;
-import org.webrtc.SessionDescription;
 import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoDecoderFactory;
@@ -35,7 +31,6 @@ import org.webrtc.VideoTrack;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import io.socket.client.Socket;
 import nl.comptex.webrtc.databinding.ActivityMainBinding;
 import pub.devrel.easypermissions.EasyPermissions;
 
@@ -48,7 +43,6 @@ public class MainActivity extends AppCompatActivity {
     private EglBase eglBase;
     private WebServer server;
     private PeerConnection connection;
-    private Socket socket;
 
 
     @Override
@@ -105,72 +99,11 @@ public class MainActivity extends AppCompatActivity {
         mediaStream.addTrack(track);
         connection.addStream(mediaStream);
 
-//
-//        try {
-//            socket = IO.socket("http://192.168.2.22:3000");
-//            socket.on(EVENT_CONNECT, args -> {
-//                Log.d(TAG, "Connected");
-//                socket.emit("ident","camera");
-//            });
-//            socket.on("message", args -> {
-//                assert args[0] instanceof JSONObject;
-//                try {
-//                    JSONObject obj = (JSONObject) args[0];
-//                    String type = obj.getString("type");
-//                    if (type.equals("offer")) {
-//                        connection.setRemoteDescription(new SimpleSdpObserver(), new SessionDescription(OFFER, obj.getString("sdp")));
-//                        doAnswer(socket);
-//                    }
-//                    if (type.equals("candidate")) {
-//                        IceCandidate candidate = new IceCandidate(obj.getString("id"), obj.getInt("label"), obj.getString("candidate"));
-//                        connection.addIceCandidate(candidate);
-//                    }
-//                } catch (JSONException e) {
-//                    e.printStackTrace();
-//                }
-//
-//            });
-//            socket.connect();
-//        } catch (URISyntaxException e) {
-//            e.printStackTrace();
-//        }
-
         try {
             server = new WebServer(connection);
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private void doAnswer(Socket socket) {
-        MediaConstraints constraints = new MediaConstraints();
-        constraints.mandatory.add(
-                new MediaConstraints.KeyValuePair("maxWidth", "1920"));
-        constraints.mandatory.add(
-                new MediaConstraints.KeyValuePair("maxHeight", "1080"));
-        constraints.mandatory.add(
-                new MediaConstraints.KeyValuePair("maxFrameRate", "60"));
-        connection.createAnswer(new SimpleSdpObserver() {
-            @Override
-            public void onCreateSuccess(SessionDescription sessionDescription) {
-                connection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
-                JSONObject message = new JSONObject();
-                try {
-                    message.put("type", sessionDescription.type.canonicalForm());
-                    message.put("sdp", sessionDescription.description);
-                    socket.emit("message", message);
-                    Log.i(TAG + " answer", sessionDescription.description);
-                    Log.i(TAG, sessionDescription.type.toString());
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-            }
-
-            @Override
-            public void onCreateFailure(String s) {
-                Log.e(TAG, s);
-            }
-        }, constraints);
     }
 
     private VideoCapturer createVideoCapturer() {
@@ -246,19 +179,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onIceCandidate(IceCandidate iceCandidate) {
                 Log.d(TAG, "onIceCandidate: " + iceCandidate.toString());
-
-//                JSONObject message = new JSONObject();
-//
-//                try {
-//                    message.put("type", "candidate");
-//                    message.put("sdpMLineIndex", iceCandidate.sdpMLineIndex);
-//                    message.put("sdpMid", iceCandidate.sdpMid);
-//                    message.put("candidate", iceCandidate.sdp);
-//
-//                    socket.emit("message", message);
-//                } catch (JSONException e) {
-//                    e.printStackTrace();
-//                }
             }
 
             @Override

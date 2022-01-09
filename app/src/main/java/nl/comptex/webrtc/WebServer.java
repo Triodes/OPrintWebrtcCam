@@ -71,12 +71,20 @@ class WebServer extends NanoHTTPD {
 
     private Response doAnswer() {
         synchronized (connection) {
+            MediaConstraints constraints = new MediaConstraints();
+            constraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair("maxWidth", "1920"));
+            constraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair("maxHeight", "1080"));
+            constraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair("maxFrameRate", "60"));
+
             connection.createAnswer(new SimpleSdpObserver() {
                 @Override
                 public void onCreateSuccess(SessionDescription sessionDescription) {
                     connection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
                 }
-            }, new MediaConstraints());
+            }, constraints);
 
             try {
                 connection.wait();
@@ -84,7 +92,6 @@ class WebServer extends NanoHTTPD {
                 e.printStackTrace();
                 return badRequest(Status.INTERNAL_ERROR);
             }
-
 
             try {
                 JSONObject message = new JSONObject();
