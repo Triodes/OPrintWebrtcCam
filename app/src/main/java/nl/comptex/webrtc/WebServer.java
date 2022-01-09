@@ -83,6 +83,7 @@ class WebServer extends NanoHTTPD {
                 @Override
                 public void onCreateSuccess(SessionDescription sessionDescription) {
                     connection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
+                    Log.i(TAG + " initialAnswer", sessionDescription.description);
                 }
             }, constraints);
 

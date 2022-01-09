@@ -156,8 +156,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onIceConnectionChange(PeerConnection.IceConnectionState iceConnectionState) {
                 Log.d(TAG, "onIceConnectionChange: " + iceConnectionState.name());
-//                Log.d(TAG, "setting bitrate");
-//                connection.setBitrate(256000, null, 10000000);
+                Log.d(TAG, "setting bitrate");
+                connection.setBitrate(256000, null, 10000000);
             }
 
             @Override
