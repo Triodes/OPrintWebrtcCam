@@ -84,46 +84,51 @@ class WebServer extends NanoHTTPD {
     }
 
     private Response doAnswer() {
-        synchronized (lock) {
-            MediaConstraints constraints = new MediaConstraints();
-            constraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair("maxWidth", "1920"));
-            constraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair("maxHeight", "1080"));
-            constraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair("maxFrameRate", "60"));
+        MediaConstraints constraints = new MediaConstraints();
+        constraints.mandatory.add(
+                new MediaConstraints.KeyValuePair("maxWidth", "1920"));
+        constraints.mandatory.add(
+                new MediaConstraints.KeyValuePair("maxHeight", "1080"));
+        constraints.mandatory.add(
+                new MediaConstraints.KeyValuePair("maxFrameRate", "60"));
 
-            connection.createAnswer(new SimpleSdpObserver() {
-                @Override
-                public void onCreateSuccess(SessionDescription sessionDescription) {
-                    connection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
+        connection.createAnswer(new SimpleSdpObserver() {
+            @Override
+            public void onCreateSuccess(SessionDescription sessionDescription) {
+                connection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
 //                    Log.d(TAG + " initialAnswer", sessionDescription.description);
-                    Log.d(TAG, "Generated initial answer");
-                }
-            }, constraints);
+                Log.d(TAG, "Generated initial answer");
+            }
+        }, constraints);
 
+        synchronized (lock) {
             try {
-                Log.d(TAG, "waiting for ICE to complete");
-                lock.wait();
-                Log.d(TAG, "continuing");
+                if (connection.iceGatheringState() != PeerConnection.IceGatheringState.COMPLETE) {
+                    Log.d(TAG, "waiting for ICE to complete");
+                    lock.wait();
+                    Log.d(TAG, "continuing");
+                } else {
+                    Log.d(TAG, "gathering already complete, continuing");
+                }
             } catch (InterruptedException e) {
                 e.printStackTrace();
                 return badRequest(Status.INTERNAL_ERROR);
             }
-
-            try {
-                JSONObject message = new JSONObject();
-                SessionDescription description = connection.getLocalDescription();
-                message.put("type", description.type.canonicalForm());
-                message.put("sdp", description.description);
-//                Log.d(TAG + " answer", description.description);
-                Log.d(TAG, "sending final answer");
-                return goodRequest(message.toString());
-            } catch (JSONException e) {
-                e.printStackTrace();
-                return badRequest(Status.INTERNAL_ERROR);
-            }
         }
+
+        try {
+            JSONObject message = new JSONObject();
+            SessionDescription description = connection.getLocalDescription();
+            message.put("type", description.type.canonicalForm());
+            message.put("sdp", description.description);
+//                Log.d(TAG + " answer", description.description);
+            Log.d(TAG, "sending final answer");
+            return goodRequest(message.toString());
+        } catch (JSONException e) {
+            e.printStackTrace();
+            return badRequest(Status.INTERNAL_ERROR);
+        }
+
     }
 
     private PeerConnection createPeerConnection(PeerConnectionFactory factory) {
@@ -213,7 +218,7 @@ class WebServer extends NanoHTTPD {
     }
 
     private Response badRequest(Status statusCode) {
-        return addHeaders(newFixedLengthResponse(statusCode, MIME_PLAINTEXT, ""));
+        return addHeaders(newFixedLengthResponse(statusCode, MIME_PLAINTEXT + "; charset=UTF-8", ""));
     }
 
     private Response goodRequest() {
@@ -221,7 +226,7 @@ class WebServer extends NanoHTTPD {
     }
 
     private Response goodRequest(String json) {
-        return addHeaders(newFixedLengthResponse(Status.OK, "application/json", json));
+        return addHeaders(newFixedLengthResponse(Status.OK, "application/json; charset=UTF-8", json));
     }
 
     private Response addHeaders(Response response) {
