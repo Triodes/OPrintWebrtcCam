@@ -28,7 +28,7 @@ class WebServer extends NanoHTTPD {
 
     private final PeerConnectionFactory factory;
     private final Object lock = new Object();
-    private MediaStream mediaStream;
+    private final MediaStream mediaStream;
     private PeerConnection connection;
 
     public WebServer(PeerConnectionFactory factory, MediaStream mediaStream) throws IOException {

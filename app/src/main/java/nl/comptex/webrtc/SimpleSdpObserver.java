@@ -22,6 +22,7 @@ class SimpleSdpObserver implements SdpObserver {
 
     @Override
     public void onSetFailure(String s) {
+        Log.d(TAG, "Set description failed: " + s);
     }
 
 }
