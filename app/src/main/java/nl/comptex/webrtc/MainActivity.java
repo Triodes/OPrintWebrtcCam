@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
     private EglBase eglBase;
     private WebServer server;
     private PeerConnection connection;
+    private Object lockObject = new Object();
 
 
     @Override
@@ -75,11 +76,10 @@ public class MainActivity extends AppCompatActivity {
         binding.surfaceView.setEnableHardwareScaler(true);
         binding.surfaceView.setMirror(true);
 
-        VideoEncoderFactory encoderFactory = new DefaultVideoEncoderFactory(eglBase.getEglBaseContext(), true, true);
+        VideoEncoderFactory encoderFactory = new DefaultVideoEncoderFactory(eglBase.getEglBaseContext(), true, false);
         VideoDecoderFactory decoderFactory = new DefaultVideoDecoderFactory(eglBase.getEglBaseContext());
 
         PeerConnectionFactory factory = PeerConnectionFactory.builder()
-                .setVideoDecoderFactory(decoderFactory)
                 .setVideoEncoderFactory(encoderFactory)
                 .createPeerConnectionFactory();
 
@@ -94,13 +94,11 @@ public class MainActivity extends AppCompatActivity {
         track.setEnabled(true);
         track.addSink(binding.surfaceView);
 
-        connection = createPeerConnection(factory);
         MediaStream mediaStream = factory.createLocalMediaStream("STREAM");
         mediaStream.addTrack(track);
-        connection.addStream(mediaStream);
 
         try {
-            server = new WebServer(connection);
+            server = new WebServer(factory, mediaStream);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -140,78 +138,5 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return null;
-    }
-
-    private PeerConnection createPeerConnection(PeerConnectionFactory factory) {
-        ArrayList<PeerConnection.IceServer> iceServers = new ArrayList<>();
-        String URL = "stun:stun.l.google.com:19302";
-        iceServers.add(PeerConnection.IceServer.builder(URL).createIceServer());
-
-        PeerConnection.Observer pcObserver = new PeerConnection.Observer() {
-            @Override
-            public void onSignalingChange(PeerConnection.SignalingState signalingState) {
-                Log.d(TAG, "onSignalingChange: " + signalingState.name());
-            }
-
-            @Override
-            public void onIceConnectionChange(PeerConnection.IceConnectionState iceConnectionState) {
-                Log.d(TAG, "onIceConnectionChange: " + iceConnectionState.name());
-                Log.d(TAG, "setting bitrate");
-                connection.setBitrate(256000, null, 10000000);
-            }
-
-            @Override
-            public void onIceConnectionReceivingChange(boolean b) {
-                Log.d(TAG, "onIceConnectionReceivingChange: ");
-            }
-
-            @Override
-            public void onIceGatheringChange(PeerConnection.IceGatheringState iceGatheringState) {
-                Log.d(TAG, "onIceGatheringChange: " + iceGatheringState.name());
-
-                if (iceGatheringState == PeerConnection.IceGatheringState.COMPLETE) {
-                    synchronized (connection) {
-                        connection.notify();
-                    }
-                }
-            }
-
-            @Override
-            public void onIceCandidate(IceCandidate iceCandidate) {
-                Log.d(TAG, "onIceCandidate: " + iceCandidate.sdp);
-            }
-
-            @Override
-            public void onIceCandidatesRemoved(IceCandidate[] iceCandidates) {
-                Log.d(TAG, "onIceCandidatesRemoved: ");
-            }
-
-            @Override
-            public void onAddStream(MediaStream mediaStream) {
-                Log.d(TAG, "onAddStream: " + mediaStream.videoTracks.size());
-            }
-
-            @Override
-            public void onRemoveStream(MediaStream mediaStream) {
-                Log.d(TAG, "onRemoveStream: ");
-            }
-
-            @Override
-            public void onDataChannel(DataChannel dataChannel) {
-                Log.d(TAG, "onDataChannel: ");
-            }
-
-            @Override
-            public void onRenegotiationNeeded() {
-                Log.d(TAG, "onRenegotiationNeeded: ");
-            }
-
-            @Override
-            public void onAddTrack(RtpReceiver rtpReceiver, MediaStream[] mediaStreams) {
-                Log.d(TAG, "onAddStream: " + mediaStreams.length);
-            }
-        };
-
-        return factory.createPeerConnection(iceServers, pcObserver);
     }
 }
