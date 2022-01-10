@@ -178,7 +178,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onIceCandidate(IceCandidate iceCandidate) {
-                Log.d(TAG, "onIceCandidate: " + iceCandidate.toString());
+                Log.d(TAG, "onIceCandidate: " + iceCandidate.sdp);
             }
 
             @Override
