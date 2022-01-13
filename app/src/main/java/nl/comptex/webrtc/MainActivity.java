@@ -81,6 +81,7 @@ public class MainActivity extends AppCompatActivity {
 
         PeerConnectionFactory factory = PeerConnectionFactory.builder()
                 .setVideoEncoderFactory(encoderFactory)
+                .setVideoDecoderFactory(decoderFactory)
                 .createPeerConnectionFactory();
 
         VideoSource videoSource = factory.createVideoSource(false);
