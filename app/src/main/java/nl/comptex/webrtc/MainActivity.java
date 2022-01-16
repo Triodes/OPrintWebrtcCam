@@ -1,35 +1,20 @@
 package nl.comptex.webrtc;
 
 import android.Manifest;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import org.webrtc.Camera1Enumerator;
-import org.webrtc.Camera2Enumerator;
-import org.webrtc.CameraEnumerator;
-import org.webrtc.DataChannel;
-import org.webrtc.DefaultVideoDecoderFactory;
-import org.webrtc.DefaultVideoEncoderFactory;
 import org.webrtc.EglBase;
-import org.webrtc.IceCandidate;
-import org.webrtc.MediaStream;
-import org.webrtc.PeerConnection;
-import org.webrtc.PeerConnectionFactory;
-import org.webrtc.PeerConnectionFactory.InitializationOptions;
-import org.webrtc.RtpReceiver;
-import org.webrtc.SurfaceTextureHelper;
-import org.webrtc.VideoCapturer;
-import org.webrtc.VideoDecoderFactory;
-import org.webrtc.VideoEncoderFactory;
-import org.webrtc.VideoSource;
-import org.webrtc.VideoTrack;
-
-import java.io.IOException;
-import java.util.ArrayList;
 
 import nl.comptex.webrtc.databinding.ActivityMainBinding;
 import pub.devrel.easypermissions.EasyPermissions;
@@ -38,13 +23,10 @@ public class MainActivity extends AppCompatActivity {
 
     public static final String TAG = "MAINACT";
     private static final boolean USE_FRONT_CAMERA = true;
-
+    private Intent intent;
     private ActivityMainBinding binding;
-    private EglBase eglBase;
-    private WebServer server;
-    private PeerConnection connection;
-    private Object lockObject = new Object();
-
+    private final Object lock = new Object();
+    ComponentName componentName;
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -57,7 +39,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -66,78 +47,79 @@ public class MainActivity extends AppCompatActivity {
         if (!EasyPermissions.hasPermissions(this, perms)) {
             EasyPermissions.requestPermissions(this, "Need some permissions", 1337, perms);
         }
+    }
 
-        InitializationOptions initOptions = InitializationOptions.builder(this.getApplicationContext())
-                .createInitializationOptions();
-        PeerConnectionFactory.initialize(initOptions);
+    @Override
+    protected void onStart() {
+        intent = new Intent(this, WebRTCService.class);
+        componentName = startForegroundService(intent);
+        if (!bound)
+            bindService(intent, connection, Context.BIND_ABOVE_CLIENT);
+        super.onStart();
+    }
 
-        eglBase = EglBase.create();
+    @Override
+    protected void onStop() {
+        releaseSurfaceView();
+        super.onStop();
+    }
+
+    @Override
+    protected void onRestart() {
+        initAndBindSurfaceView();
+        super.onRestart();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (bound) {
+            unbindService(connection);
+            bound = false;
+        }
+        super.onDestroy();
+    }
+
+    @Override
+    public void onBackPressed() {
+        releaseSurfaceView();
+        stopService(intent);
+        finish();
+        super.onBackPressed();
+    }
+
+    private WebRTCService service;
+    private boolean bound = false;
+    /**
+     * Defines callbacks for service binding, passed to bindService()
+     */
+    private final ServiceConnection connection = new ServiceConnection() {
+
+        @Override
+        public void onServiceConnected(ComponentName className, IBinder binder) {
+            // We've bound to LocalService, cast the IBinder and get LocalService instance
+            Log.d(TAG, "got there");
+            WebRTCService.LocalBinder localBinder = (WebRTCService.LocalBinder) binder;
+            service = localBinder.getService();
+            bound = true;
+            initAndBindSurfaceView();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName arg0) {
+            bound = false;
+        }
+    };
+
+    private void initAndBindSurfaceView() {
+        EglBase eglBase = service.getEglBase();
         binding.surfaceView.init(eglBase.getEglBaseContext(), null);
         binding.surfaceView.setEnableHardwareScaler(true);
-        binding.surfaceView.setMirror(true);
-
-        VideoEncoderFactory encoderFactory = new DefaultVideoEncoderFactory(eglBase.getEglBaseContext(), true, false);
-        VideoDecoderFactory decoderFactory = new DefaultVideoDecoderFactory(eglBase.getEglBaseContext());
-
-        PeerConnectionFactory factory = PeerConnectionFactory.builder()
-                .setVideoEncoderFactory(encoderFactory)
-                .setVideoDecoderFactory(decoderFactory)
-                .createPeerConnectionFactory();
-
-        VideoSource videoSource = factory.createVideoSource(false);
-        VideoTrack track = factory.createVideoTrack("VIDEO", videoSource);
-
-        VideoCapturer capturer = createVideoCapturer();
-        SurfaceTextureHelper helper = SurfaceTextureHelper.create("THREAD", eglBase.getEglBaseContext());
-        capturer.initialize(helper, this, videoSource.getCapturerObserver());
-        capturer.startCapture(1920, 1080, 60);
-
-        track.setEnabled(true);
-        track.addSink(binding.surfaceView);
-
-        MediaStream mediaStream = factory.createLocalMediaStream("STREAM");
-        mediaStream.addTrack(track);
-
-        try {
-            server = new WebServer(factory, mediaStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        binding.surfaceView.setMirror(USE_FRONT_CAMERA);
+        service.addSink(binding.surfaceView);
     }
 
-    private VideoCapturer createVideoCapturer() {
-        VideoCapturer videoCapturer;
-        if (Camera2Enumerator.isSupported(this)) {
-            videoCapturer = createCameraCapturer(new Camera2Enumerator(this));
-        } else {
-            videoCapturer = createCameraCapturer(new Camera1Enumerator(true));
-        }
-        return videoCapturer;
-    }
-
-    private VideoCapturer createCameraCapturer(CameraEnumerator enumerator) {
-        final String[] deviceNames = enumerator.getDeviceNames();
-
-        for (String deviceName : deviceNames) {
-            if (enumerator.isFrontFacing(deviceName) == USE_FRONT_CAMERA) {
-                VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
-
-                if (videoCapturer != null) {
-                    return videoCapturer;
-                }
-            }
-        }
-
-        for (String deviceName : deviceNames) {
-            if (enumerator.isFrontFacing(deviceName) != USE_FRONT_CAMERA) {
-                VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
-
-                if (videoCapturer != null) {
-                    return videoCapturer;
-                }
-            }
-        }
-
-        return null;
+    private void releaseSurfaceView() {
+        service.removeSink(binding.surfaceView);
+        binding.surfaceView.release();
     }
 }

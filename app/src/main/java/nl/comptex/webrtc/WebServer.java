@@ -12,7 +12,9 @@ import org.webrtc.MediaConstraints;
 import org.webrtc.MediaStream;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
+import org.webrtc.RtpParameters;
 import org.webrtc.RtpReceiver;
+import org.webrtc.RtpSender;
 import org.webrtc.SessionDescription;
 
 import java.io.IOException;
@@ -31,12 +33,15 @@ class WebServer extends NanoHTTPD {
     private final MediaStream mediaStream;
     private PeerConnection connection;
 
-    public WebServer(PeerConnectionFactory factory, MediaStream mediaStream) throws IOException {
+    public WebServer(PeerConnectionFactory factory, MediaStream mediaStream) {
         super(8080);
         this.factory = factory;
         this.mediaStream = mediaStream;
+    }
+
+    public void start() throws IOException {
         start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
-        Log.d(TAG, "Running! Point your browsers to http://<phone-ip>:8080/");
+        Log.i(TAG, "Running! Point your browsers to http://<phone-ip>:8080/");
     }
 
     @Override
@@ -67,9 +72,8 @@ class WebServer extends NanoHTTPD {
         try {
             String sdp = obj.getString("sdp");
             String type = obj.getString("type");
-//            Log.d(TAG + " offer", sdp);
-            Log.d(TAG, "received offer");
             if (type.equals("offer")) {
+                Log.d(TAG, "Received offer");
                 if (connection != null)
                     connection.close();
                 connection = createPeerConnection(factory);
@@ -96,7 +100,6 @@ class WebServer extends NanoHTTPD {
             @Override
             public void onCreateSuccess(SessionDescription sessionDescription) {
                 connection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
-//                    Log.d(TAG + " initialAnswer", sessionDescription.description);
                 Log.d(TAG, "Generated initial answer");
             }
         }, constraints);
@@ -104,11 +107,11 @@ class WebServer extends NanoHTTPD {
         synchronized (lock) {
             try {
                 if (connection.iceGatheringState() != PeerConnection.IceGatheringState.COMPLETE) {
-                    Log.d(TAG, "waiting for ICE to complete");
+                    Log.d(TAG, "Waiting for ICE to complete");
                     lock.wait();
-                    Log.d(TAG, "continuing");
+                    Log.d(TAG, "ICE gathering completed, continuing");
                 } else {
-                    Log.d(TAG, "gathering already complete, continuing");
+                    Log.d(TAG, "ICE gathering already complete, continuing");
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -121,8 +124,7 @@ class WebServer extends NanoHTTPD {
             SessionDescription description = connection.getLocalDescription();
             message.put("type", description.type.canonicalForm());
             message.put("sdp", description.description);
-//                Log.d(TAG + " answer", description.description);
-            Log.d(TAG, "sending final answer");
+            Log.d(TAG, "Sending final answer");
             return goodRequest(message.toString());
         } catch (JSONException e) {
             e.printStackTrace();
@@ -146,14 +148,13 @@ class WebServer extends NanoHTTPD {
             public void onIceConnectionChange(PeerConnection.IceConnectionState iceConnectionState) {
                 Log.d(TAG, "onIceConnectionChange: " + iceConnectionState.name());
                 if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
-                    Log.d(TAG, "setting bitrate");
-                    connection.setBitrate(256000, null, 10000000);
+                    setVideoMaxBitrate();
                 }
             }
 
             @Override
             public void onIceConnectionReceivingChange(boolean b) {
-                Log.d(TAG, "onIceConnectionReceivingChange: " + Boolean.toString(b));
+                Log.d(TAG, "onIceConnectionReceivingChange: " + b);
             }
 
             @Override
@@ -213,6 +214,30 @@ class WebServer extends NanoHTTPD {
         return peerConnection;
     }
 
+    public void setVideoMaxBitrate() {
+        RtpSender localVideoSender = connection.getSenders().get(0);
+        int maxBitrateKbps = 4000;
+
+        Log.d(TAG, "Requested max video bitrate: " + maxBitrateKbps);
+        if (localVideoSender == null) {
+            Log.w(TAG, "Sender is not ready.");
+            return;
+        }
+        RtpParameters parameters = localVideoSender.getParameters();
+        if (parameters.encodings.size() == 0) {
+            Log.w(TAG, "RtpParameters are not ready.");
+            return;
+        }
+        for (RtpParameters.Encoding encoding : parameters.encodings) {
+            // Null value means no limit.
+            encoding.maxBitrateBps = maxBitrateKbps * 1000;
+        }
+        if (!localVideoSender.setParameters(parameters)) {
+            Log.e(TAG, "RtpSender.setParameters failed.");
+        }
+        Log.d(TAG, "Configured max video bitrate to: " + maxBitrateKbps);
+    }
+
     private Response badRequest() {
         return badRequest(Status.BAD_REQUEST);
     }
@@ -236,5 +261,13 @@ class WebServer extends NanoHTTPD {
         response.addHeader("Access-Control-Allow-Headers", "*");
 
         return response;
+    }
+
+    public void dispose() {
+        this.stop();
+        if (connection != null)
+            connection.dispose();
+        else
+            mediaStream.dispose();
     }
 }
