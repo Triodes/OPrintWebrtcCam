@@ -1,4 +1,4 @@
-package nl.comptex.webrtc;
+package nl.comptex.oprintwebrtccam;
 
 import org.junit.Test;
 

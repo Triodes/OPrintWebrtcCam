@@ -1,4 +1,4 @@
-package nl.comptex.webrtc;
+package nl.comptex.oprintwebrtccam;
 
 
 import android.app.Notification;
@@ -6,16 +6,10 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.net.ConnectivityManager;
 import android.os.Binder;
 import android.os.IBinder;
-import android.util.Log;
-
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera2Enumerator;
@@ -38,7 +32,7 @@ import java.io.IOException;
 public class WebRTCService extends Service {
     private static final boolean USE_FRONT_CAMERA = true;
     private static final int ONGOING_NOTIFICATION_ID = 1337;
-    public static final String WEBRTCCHANNEL = "webrtcchannel";
+    public static final String WEBRTC_CHANNEL = "webrtcchannel";
     private VideoTrack track;
     private EglBase eglBase;
     private WebServer server;
@@ -51,8 +45,48 @@ public class WebRTCService extends Service {
     public WebRTCService() {
     }
 
+    //region Lifecycle callbacks
+
     @Override
     public void onCreate() {
+        createMediaStream();
+
+        server = new WebServer(factory, mediaStream);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        createNotification();
+
+        capturer.startCapture(1920, 1080, 30);
+
+        try {
+            if (!server.wasStarted())
+                server.start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return START_STICKY;
+    }
+
+    @Override
+    public void onDestroy() {
+        server.dispose();
+        capturer.dispose();
+        mediaStream.dispose();
+        videoSource.dispose();
+        helper.dispose();
+        factory.dispose();
+        eglBase.release();
+        super.onDestroy();
+    }
+
+    //endregion
+
+    //region MediaStream creation methods
+
+    private void createMediaStream() {
         PeerConnectionFactory.InitializationOptions initOptions = PeerConnectionFactory.InitializationOptions.builder(this.getApplicationContext())
                 .createInitializationOptions();
         PeerConnectionFactory.initialize(initOptions);
@@ -79,35 +113,6 @@ public class WebRTCService extends Service {
 
         mediaStream = factory.createLocalMediaStream("STREAM");
         mediaStream.addTrack(track);
-
-        server = new WebServer(factory, mediaStream);
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        startNotification();
-
-        capturer.startCapture(1920, 1080, 30);
-
-        try {
-            if (!server.wasStarted())
-                server.start();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return START_STICKY;
-    }
-
-    @Override
-    public void onDestroy() {
-        server.dispose();
-        capturer.dispose();
-        videoSource.dispose();
-        helper.dispose();
-        factory.dispose();
-        eglBase.release();
-        super.onDestroy();
     }
 
     private VideoCapturer createVideoCapturer() {
@@ -146,6 +151,10 @@ public class WebRTCService extends Service {
         return null;
     }
 
+    //endregion
+
+    //region Binding logic and methods
+
     private final IBinder binder = new LocalBinder();
 
     /**
@@ -176,19 +185,21 @@ public class WebRTCService extends Service {
         return eglBase;
     }
 
-    public void startNotification() {
+    //endregion
+
+    public void createNotification() {
         PendingIntent onClickPendingIntent = PendingIntent.getActivity(
                 this,
                 0,
                 new Intent(this, MainActivity.class),
                 PendingIntent.FLAG_IMMUTABLE);
 
-        NotificationChannel chan = new NotificationChannel(WEBRTCCHANNEL, "WebRTC background", NotificationManager.IMPORTANCE_LOW);
+        NotificationChannel chan = new NotificationChannel(WEBRTC_CHANNEL, "WebRTC background", NotificationManager.IMPORTANCE_LOW);
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         manager.createNotificationChannel(chan);
 
         Notification notification =
-                new Notification.Builder(this, WEBRTCCHANNEL)
+                new Notification.Builder(this, WEBRTC_CHANNEL)
                         .setContentTitle("WebRTC camera")
                         .setContentText("Tap to return to app")
                         .setSmallIcon(R.drawable.videocamera)

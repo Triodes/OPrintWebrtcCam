@@ -1,12 +1,10 @@
-package nl.comptex.webrtc;
+package nl.comptex.oprintwebrtccam;
 
 import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.content.pm.ActivityInfo;
-import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
@@ -16,7 +14,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import org.webrtc.EglBase;
 
-import nl.comptex.webrtc.databinding.ActivityMainBinding;
+import nl.comptex.oprintwebrtccam.databinding.ActivityMainBinding;
 import pub.devrel.easypermissions.EasyPermissions;
 
 public class MainActivity extends AppCompatActivity {
@@ -25,7 +23,6 @@ public class MainActivity extends AppCompatActivity {
     private static final boolean USE_FRONT_CAMERA = true;
     private Intent intent;
     private ActivityMainBinding binding;
-    private final Object lock = new Object();
     ComponentName componentName;
 
     @Override
@@ -59,15 +56,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onStop() {
-        releaseSurfaceView();
-        super.onStop();
-    }
-
-    @Override
     protected void onRestart() {
         initAndBindSurfaceView();
         super.onRestart();
+    }
+
+    @Override
+    protected void onStop() {
+        releaseSurfaceView();
+        super.onStop();
     }
 
     @Override

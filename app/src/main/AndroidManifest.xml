@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="nl.comptex.webrtc">
+    package="nl.comptex.oprintwebrtccam">
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -18,12 +18,12 @@
         android:usesCleartextTraffic="true">
 
         <service
-            android:name=".WebRTCService"
+            android:name="nl.comptex.oprintwebrtccam.WebRTCService"
             android:enabled="true"
             android:exported="false" />
 
         <activity
-            android:name=".MainActivity"
+            android:name="nl.comptex.oprintwebrtccam.MainActivity"
             android:exported="true"
             android:screenOrientation="landscape">
             <intent-filter>
