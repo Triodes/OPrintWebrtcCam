@@ -108,6 +108,9 @@ public class MainActivity extends AppCompatActivity {
     };
 
     private void initAndBindSurfaceView() {
+        if (!bound)
+            return;
+        
         EglBase eglBase = service.getEglBase();
         binding.surfaceView.init(eglBase.getEglBaseContext(), null);
         binding.surfaceView.setEnableHardwareScaler(true);
@@ -116,6 +119,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void releaseSurfaceView() {
+        if (!bound)
+            return;
+
         service.removeSink(binding.surfaceView);
         binding.surfaceView.release();
     }
