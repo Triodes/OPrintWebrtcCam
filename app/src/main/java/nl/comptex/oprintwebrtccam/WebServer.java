@@ -87,6 +87,14 @@ class WebServer extends NanoHTTPD {
         }
     }
 
+    public void dispose() {
+        this.stop();
+        if (connection != null)
+            connection.dispose();
+        else
+            mediaStream.dispose();
+    }
+
     private Response doAnswer() {
         MediaConstraints constraints = new MediaConstraints();
         constraints.mandatory.add(
@@ -238,6 +246,7 @@ class WebServer extends NanoHTTPD {
         Log.d(TAG, "Configured max video bitrate to: " + maxBitrateKbps);
     }
 
+    //region Response utility functions
     private Response badRequest() {
         return badRequest(Status.BAD_REQUEST);
     }
@@ -262,12 +271,5 @@ class WebServer extends NanoHTTPD {
 
         return response;
     }
-
-    public void dispose() {
-        this.stop();
-        if (connection != null)
-            connection.dispose();
-        else
-            mediaStream.dispose();
-    }
+    //endregion
 }
