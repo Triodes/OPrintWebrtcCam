@@ -74,7 +74,6 @@ public class WebRTCService extends Service {
     public void onDestroy() {
         server.dispose();
         capturer.dispose();
-        mediaStream.dispose();
         videoSource.dispose();
         helper.dispose();
         factory.dispose();
