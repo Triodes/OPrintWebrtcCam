@@ -3,6 +3,14 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url "https://pkgs.dev.azure.com/navaraaron/AndroidWebrtcBuild/_packaging/android-webrtc/maven/v1"
+            name 'android-webrtc'
+            credentials{
+                username "android-webrtc"
+                password webrtcPassword
+            }
+        }
     }
 }
 rootProject.name = "OPrintWebrtcCam"
