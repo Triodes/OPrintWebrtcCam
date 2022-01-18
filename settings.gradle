@@ -11,7 +11,9 @@ dependencyResolutionManagement {
                 password webrtcPassword
             }
         }
+        jcenter()
     }
 }
 rootProject.name = "OPrintWebrtcCam"
 include ':oprintwebrtccam'
+include ':webrtcclientexample'

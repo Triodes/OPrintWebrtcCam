@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import org.webrtc.EglBase;
 
 import nl.comptex.oprintwebrtccam.databinding.ActivityMainBinding;
+import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 
 public class MainActivity extends AppCompatActivity {
@@ -24,6 +25,8 @@ public class MainActivity extends AppCompatActivity {
     private Intent intent;
     private ActivityMainBinding binding;
     ComponentName componentName;
+    private final String[] perms = new String[]{Manifest.permission.CAMERA};
+    private final int PERMISSION_REQUEST_CODE = 125478;
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -39,26 +42,23 @@ public class MainActivity extends AppCompatActivity {
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-
-        String[] perms = {Manifest.permission.CAMERA};
-        if (!EasyPermissions.hasPermissions(this, perms)) {
-            EasyPermissions.requestPermissions(this, "Need some permissions", 1337, perms);
-        }
     }
 
     @Override
     protected void onStart() {
-        intent = new Intent(this, WebRTCService.class);
-        componentName = startForegroundService(intent);
-        if (!bound)
-            bindService(intent, connection, Context.BIND_ABOVE_CLIENT);
         super.onStart();
+        if (!EasyPermissions.hasPermissions(this, perms)) {
+            EasyPermissions.requestPermissions(this, "Need some permissions", PERMISSION_REQUEST_CODE, perms);
+            return;
+        }
+
+        startAndBindService();
     }
 
     @Override
     protected void onRestart() {
-        initAndBindSurfaceView();
         super.onRestart();
+        initAndBindSurfaceView();
     }
 
     @Override
@@ -82,6 +82,15 @@ public class MainActivity extends AppCompatActivity {
         stopService(intent);
         finish();
         super.onBackPressed();
+    }
+
+    @AfterPermissionGranted(PERMISSION_REQUEST_CODE)
+    private void startAndBindService() {
+        intent = new Intent(this, WebRTCService.class);
+        componentName = startForegroundService(intent);
+        if (!bound)
+            bindService(intent, connection, Context.BIND_ABOVE_CLIENT);
+        super.onStart();
     }
 
     private WebRTCService service;

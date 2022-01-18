@@ -72,7 +72,7 @@ class WebServer extends NanoHTTPD {
         try {
             String sdp = obj.getString("sdp");
             String type = obj.getString("type");
-            if (type.equals("offer")) {
+            if (type.equals(OFFER.canonicalForm())) {
                 Log.d(TAG, "Received offer");
                 if (connection != null)
                     connection.close();
