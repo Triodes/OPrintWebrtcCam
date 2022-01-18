@@ -40,7 +40,6 @@ public class WebRTCService extends Service {
     private PeerConnectionFactory factory;
     private SurfaceTextureHelper helper;
     private VideoSource videoSource;
-    private MediaStream mediaStream;
 
     public WebRTCService() {
     }
@@ -51,7 +50,7 @@ public class WebRTCService extends Service {
     public void onCreate() {
         createMediaStream();
 
-        server = new WebServer(factory, mediaStream);
+        server = new WebServer(factory, track);
     }
 
     @Override
@@ -109,9 +108,6 @@ public class WebRTCService extends Service {
         capturer.initialize(helper, this, videoSource.getCapturerObserver());
 
         track.setEnabled(true);
-
-        mediaStream = factory.createLocalMediaStream("STREAM");
-        mediaStream.addTrack(track);
     }
 
     private VideoCapturer createVideoCapturer() {

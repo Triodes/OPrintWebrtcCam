@@ -16,9 +16,11 @@ import org.webrtc.RtpParameters;
 import org.webrtc.RtpReceiver;
 import org.webrtc.RtpSender;
 import org.webrtc.SessionDescription;
+import org.webrtc.VideoTrack;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,16 +29,16 @@ import fi.iki.elonen.NanoHTTPD.Response.Status;
 
 class WebServer extends NanoHTTPD {
     private static final String TAG = "WEBSERVER";
-
+    private final String STREAM_ID = "OctoPrintStream";
     private final PeerConnectionFactory factory;
     private final Object lock = new Object();
-    private final MediaStream mediaStream;
+    private final VideoTrack track;
     private PeerConnection connection;
 
-    public WebServer(PeerConnectionFactory factory, MediaStream mediaStream) {
+    public WebServer(PeerConnectionFactory factory, VideoTrack track) {
         super(8080);
         this.factory = factory;
-        this.mediaStream = mediaStream;
+        this.track = track;
     }
 
     public void start() throws IOException {
@@ -92,7 +94,7 @@ class WebServer extends NanoHTTPD {
         if (connection != null)
             connection.dispose();
         else
-            mediaStream.dispose();
+            track.dispose();
     }
 
     private Response doAnswer() {
@@ -218,7 +220,7 @@ class WebServer extends NanoHTTPD {
 
         PeerConnection peerConnection = factory.createPeerConnection(iceServers, pcObserver);
         assert peerConnection != null;
-        peerConnection.addStream(mediaStream);
+        peerConnection.addTrack(track, Collections.singletonList(STREAM_ID));
         return peerConnection;
     }
 
