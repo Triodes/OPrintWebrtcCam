@@ -1,12 +1,13 @@
 <resources>
-    <string name="app_name">WebRTC</string>
-    <string name="title_activity_main2">MainActivity2</string>
-    <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">First Fragment</string>
-    <string name="second_fragment_label">Second Fragment</string>
-    <string name="next">Next</string>
-    <string name="previous">Previous</string>
-
-    <string name="hello_first_fragment">Hello first fragment</string>
-    <string name="hello_second_fragment">Hello second fragment. Arg: %1$s</string>
+    <string name="app_name">OctoCam</string>
+    <string name="messages_header">Video Settings</string>
+    <string name="camera_title">Camera</string>
+    <string name="resolution_title">Resolution</string>
+    <string name="action_start_stream">start</string>
+    <string name="portrait">Portrait</string>
+    <string name="landscape">Landscape</string>
+    <string name="reverse_portrait">Portrait (upside down)</string>
+    <string name="reverse_landscape">Landscape (upside down)</string>
+    <string name="orientation_title">Orientation</string>
+    <string name="must_select_camera">You must select a camera to use!</string>
 </resources>

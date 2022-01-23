@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="orientation_entries">
+        <item>@string/portrait</item>
+        <item>@string/landscape</item>
+        <item>@string/reverse_portrait</item>
+        <item>@string/reverse_landscape</item>
+    </string-array>
+    <string-array name="orientation_entry_values">
+        <item>1</item>
+        <item>0</item>
+        <item>9</item>
+        <item>8</item>
+    </string-array>
+</resources>

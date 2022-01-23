@@ -17,22 +17,26 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WebRTC.NoActionBar"
         android:usesCleartextTraffic="true">
-
-        <service
-            android:name="nl.comptex.oprintwebrtccam.WebRTCService"
-            android:enabled="true"
-            android:exported="false" />
-
         <activity
-            android:name="nl.comptex.oprintwebrtccam.MainActivity"
+            android:name=".SettingsActivity"
             android:exported="true"
-            android:screenOrientation="portrait">
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".WebRTCService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"/>
     </application>
 
 </manifest>

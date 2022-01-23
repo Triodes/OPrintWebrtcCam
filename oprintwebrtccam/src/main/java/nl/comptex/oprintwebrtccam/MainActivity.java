@@ -5,12 +5,15 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
 
 import org.webrtc.EglBase;
 
@@ -21,12 +24,12 @@ import pub.devrel.easypermissions.EasyPermissions;
 public class MainActivity extends AppCompatActivity {
 
     public static final String TAG = "MAINACT";
-    private static final boolean USE_FRONT_CAMERA = true;
     private Intent intent;
     private ActivityMainBinding binding;
     ComponentName componentName;
     private final String[] perms = new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO};
     private final int PERMISSION_REQUEST_CODE = 125478;
+    boolean changingOrientation = false;
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -39,6 +42,16 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate");
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        int orientation = Integer.parseInt(prefs.getString(this.getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
+        if (getRequestedOrientation() != orientation) {
+            setRequestedOrientation(orientation);
+            changingOrientation = true;
+            return;
+        } else {
+            changingOrientation = false;
+        }
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -47,6 +60,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        Log.d(TAG, "onStart");
+        if (changingOrientation)
+            return;
+
         if (!EasyPermissions.hasPermissions(this, perms)) {
             EasyPermissions.requestPermissions(this, "Need some permissions", PERMISSION_REQUEST_CODE, perms);
             return;
@@ -58,17 +75,22 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onRestart() {
         super.onRestart();
+        Log.d(TAG, "onRestart");
+        if (changingOrientation)
+            return;
         initAndBindSurfaceView();
     }
 
     @Override
     protected void onStop() {
+        Log.d(TAG, "onStop");
         releaseSurfaceView();
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
+        Log.d(TAG, "onDestroy");
         if (bound) {
             unbindService(connection);
             bound = false;
@@ -103,7 +125,6 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onServiceConnected(ComponentName className, IBinder binder) {
             // We've bound to LocalService, cast the IBinder and get LocalService instance
-            Log.d(TAG, "got there");
             WebRTCService.LocalBinder localBinder = (WebRTCService.LocalBinder) binder;
             service = localBinder.getService();
             bound = true;
@@ -123,15 +144,16 @@ public class MainActivity extends AppCompatActivity {
         EglBase eglBase = service.getEglBase();
         binding.surfaceView.init(eglBase.getEglBaseContext(), null);
         binding.surfaceView.setEnableHardwareScaler(true);
-        binding.surfaceView.setMirror(USE_FRONT_CAMERA);
+        binding.surfaceView.setMirror(service.isUsingFrontFacingCamera());
         service.addSink(binding.surfaceView);
     }
 
     private void releaseSurfaceView() {
-        if (!bound)
-            return;
-
-        service.removeSink(binding.surfaceView);
         binding.surfaceView.release();
+
+        if (!bound) {
+            return;
+        }
+        service.removeSink(binding.surfaceView);
     }
 }

@@ -8,13 +8,19 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.os.Binder;
 import android.os.IBinder;
+
+import androidx.preference.PreferenceManager;
 
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
 import org.webrtc.Camera1Enumerator;
+import org.webrtc.Camera1Session;
 import org.webrtc.Camera2Enumerator;
+import org.webrtc.Camera2Session;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.DefaultVideoDecoderFactory;
 import org.webrtc.DefaultVideoEncoderFactory;
@@ -28,15 +34,14 @@ import org.webrtc.VideoDecoderFactory;
 import org.webrtc.VideoEncoderFactory;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
-import org.webrtc.voiceengine.WebRtcAudioRecord;
-import org.webrtc.voiceengine.WebRtcAudioTrack;
 
 import java.io.IOException;
 
 public class WebRTCService extends Service {
-    private static final boolean USE_FRONT_CAMERA = true;
+    private boolean usingFrontFacingCamera;
     private static final int ONGOING_NOTIFICATION_ID = 1337;
-    public static final String WEBRTC_CHANNEL = "webrtcchannel";
+    private static final String WEBRTC_CHANNEL = "webrtcchannel";
+    private static boolean isRunning = false;
 
     private WebServer server;
 
@@ -77,6 +82,7 @@ public class WebRTCService extends Service {
             e.printStackTrace();
         }
 
+        isRunning = true;
         return START_STICKY;
     }
 
@@ -89,6 +95,7 @@ public class WebRTCService extends Service {
         helper.dispose();
         factory.dispose();
         eglBase.release();
+        isRunning = false;
         super.onDestroy();
     }
 
@@ -101,9 +108,15 @@ public class WebRTCService extends Service {
                 .createInitializationOptions();
         PeerConnectionFactory.initialize(initOptions);
 
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        int orientation = Integer.parseInt(prefs.getString(this.getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
+        int angle = getAngle(orientation);
+        Camera1Session.fixedRotation = angle;
+        Camera2Session.fixedRotation = angle;
+
         eglBase = EglBase.create();
 
-        VideoEncoderFactory encoderFactory = new DefaultVideoEncoderFactory(eglBase.getEglBaseContext(), true, false);
+        VideoEncoderFactory encoderFactory = new DefaultVideoEncoderFactory(eglBase.getEglBaseContext(), true, true);
         VideoDecoderFactory decoderFactory = new DefaultVideoDecoderFactory(eglBase.getEglBaseContext());
 
         factory = PeerConnectionFactory.builder()
@@ -114,48 +127,36 @@ public class WebRTCService extends Service {
         videoSource = factory.createVideoSource(false);
         videoTrack = factory.createVideoTrack("VIDEO", videoSource);
 
-
-        capturer = createVideoCapturer();
+        capturer = createVideoCapturer(prefs.getString(this.getString(R.string.camera_preference), null));
         helper = SurfaceTextureHelper.create("THREAD", eglBase.getEglBaseContext());
         capturer.initialize(helper, this, videoSource.getCapturerObserver());
 
         videoTrack.setEnabled(true);
     }
 
-    private VideoCapturer createVideoCapturer() {
-        VideoCapturer videoCapturer;
-        if (Camera2Enumerator.isSupported(this)) {
-            videoCapturer = createCameraCapturer(new Camera2Enumerator(this));
-        } else {
-            videoCapturer = createCameraCapturer(new Camera1Enumerator(true));
+    private int getAngle(int orientation) {
+        switch (orientation) {
+            case ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE:
+                return 270;
+            case ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT:
+                return 180;
+            case ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE:
+                return 90;
+            case ActivityInfo.SCREEN_ORIENTATION_PORTRAIT:
+            default:
+                return 0;
         }
-        return videoCapturer;
     }
 
-    private VideoCapturer createCameraCapturer(CameraEnumerator enumerator) {
-        final String[] deviceNames = enumerator.getDeviceNames();
-
-        for (String deviceName : deviceNames) {
-            if (enumerator.isFrontFacing(deviceName) == USE_FRONT_CAMERA) {
-                VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
-
-                if (videoCapturer != null) {
-                    return videoCapturer;
-                }
-            }
+    private VideoCapturer createVideoCapturer(String deviceName) {
+        CameraEnumerator enumerator;
+        if (Camera2Enumerator.isSupported(this)) {
+            enumerator = new Camera2Enumerator(this);
+        } else {
+            enumerator = new Camera1Enumerator(true);
         }
-
-        for (String deviceName : deviceNames) {
-            if (enumerator.isFrontFacing(deviceName) != USE_FRONT_CAMERA) {
-                VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
-
-                if (videoCapturer != null) {
-                    return videoCapturer;
-                }
-            }
-        }
-
-        return null;
+        usingFrontFacingCamera = enumerator.isFrontFacing(deviceName);
+        return enumerator.createCapturer(deviceName, null);
     }
 
     private static final String AUDIO_ECHO_CANCELLATION_CONSTRAINT = "googEchoCancellation";
@@ -222,7 +223,7 @@ public class WebRTCService extends Service {
                 new Intent(this, MainActivity.class),
                 PendingIntent.FLAG_IMMUTABLE);
 
-        NotificationChannel chan = new NotificationChannel(WEBRTC_CHANNEL, "WebRTC background", NotificationManager.IMPORTANCE_LOW);
+        NotificationChannel chan = new NotificationChannel(WEBRTC_CHANNEL, "WebRTC background", NotificationManager.IMPORTANCE_DEFAULT);
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         manager.createNotificationChannel(chan);
 
@@ -238,4 +239,9 @@ public class WebRTCService extends Service {
         startForeground(ONGOING_NOTIFICATION_ID, notification);
     }
 
+    public boolean isUsingFrontFacingCamera() {
+        return usingFrontFacingCamera;
+    }
+
+    public static boolean isIsRunning() { return isRunning; }
 }
