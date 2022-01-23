@@ -25,7 +25,7 @@ public class MainActivity extends AppCompatActivity {
     private Intent intent;
     private ActivityMainBinding binding;
     ComponentName componentName;
-    private final String[] perms = new String[]{Manifest.permission.CAMERA};
+    private final String[] perms = new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO};
     private final int PERMISSION_REQUEST_CODE = 125478;
 
     @Override

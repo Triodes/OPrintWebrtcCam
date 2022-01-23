@@ -11,12 +11,15 @@ import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
 
+import org.webrtc.AudioSource;
+import org.webrtc.AudioTrack;
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera2Enumerator;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.DefaultVideoDecoderFactory;
 import org.webrtc.DefaultVideoEncoderFactory;
 import org.webrtc.EglBase;
+import org.webrtc.MediaConstraints;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.SurfaceViewRenderer;
@@ -25,6 +28,8 @@ import org.webrtc.VideoDecoderFactory;
 import org.webrtc.VideoEncoderFactory;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
+import org.webrtc.voiceengine.WebRtcAudioRecord;
+import org.webrtc.voiceengine.WebRtcAudioTrack;
 
 import java.io.IOException;
 
@@ -32,13 +37,19 @@ public class WebRTCService extends Service {
     private static final boolean USE_FRONT_CAMERA = true;
     private static final int ONGOING_NOTIFICATION_ID = 1337;
     public static final String WEBRTC_CHANNEL = "webrtcchannel";
-    private VideoTrack track;
-    private EglBase eglBase;
+
     private WebServer server;
-    private VideoCapturer capturer;
+
+    private EglBase eglBase;
     private PeerConnectionFactory factory;
     private SurfaceTextureHelper helper;
+
+    private VideoCapturer capturer;
+
     private VideoSource videoSource;
+    private VideoTrack videoTrack;
+    private AudioSource audioSource;
+    private AudioTrack audioTrack;
 
     public WebRTCService() {
     }
@@ -47,16 +58,17 @@ public class WebRTCService extends Service {
 
     @Override
     public void onCreate() {
-        createMediaStream();
+        createVideoStreamTrack();
+        createAudioStreamTrack();
 
-        server = new WebServer(factory, track);
+        server = new WebServer(factory, videoTrack, audioTrack);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         createNotification();
 
-        capturer.startCapture(1920, 1080, 30);
+        capturer.startCapture(1920,1080, 30);
 
         try {
             if (!server.wasStarted())
@@ -73,6 +85,7 @@ public class WebRTCService extends Service {
         server.dispose();
         capturer.dispose();
         videoSource.dispose();
+        audioSource.dispose();
         helper.dispose();
         factory.dispose();
         eglBase.release();
@@ -83,7 +96,7 @@ public class WebRTCService extends Service {
 
     //region MediaStream creation methods
 
-    private void createMediaStream() {
+    private void createVideoStreamTrack() {
         PeerConnectionFactory.InitializationOptions initOptions = PeerConnectionFactory.InitializationOptions.builder(this.getApplicationContext())
                 .createInitializationOptions();
         PeerConnectionFactory.initialize(initOptions);
@@ -99,14 +112,14 @@ public class WebRTCService extends Service {
                 .createPeerConnectionFactory();
 
         videoSource = factory.createVideoSource(false);
-        track = factory.createVideoTrack("VIDEO", videoSource);
+        videoTrack = factory.createVideoTrack("VIDEO", videoSource);
 
 
         capturer = createVideoCapturer();
         helper = SurfaceTextureHelper.create("THREAD", eglBase.getEglBaseContext());
         capturer.initialize(helper, this, videoSource.getCapturerObserver());
 
-        track.setEnabled(true);
+        videoTrack.setEnabled(true);
     }
 
     private VideoCapturer createVideoCapturer() {
@@ -145,6 +158,27 @@ public class WebRTCService extends Service {
         return null;
     }
 
+    private static final String AUDIO_ECHO_CANCELLATION_CONSTRAINT = "googEchoCancellation";
+    private static final String AUDIO_AUTO_GAIN_CONTROL_CONSTRAINT = "googAutoGainControl";
+    private static final String AUDIO_HIGH_PASS_FILTER_CONSTRAINT = "googHighpassFilter";
+    private static final String AUDIO_NOISE_SUPPRESSION_CONSTRAINT = "googNoiseSuppression";
+
+    private void createAudioStreamTrack() {
+        MediaConstraints audioConstraints = new MediaConstraints();
+        audioConstraints.mandatory.add(
+                new MediaConstraints.KeyValuePair(AUDIO_ECHO_CANCELLATION_CONSTRAINT, "false"));
+        audioConstraints.mandatory.add(
+                new MediaConstraints.KeyValuePair(AUDIO_AUTO_GAIN_CONTROL_CONSTRAINT, "true"));
+        audioConstraints.mandatory.add(
+                new MediaConstraints.KeyValuePair(AUDIO_HIGH_PASS_FILTER_CONSTRAINT, "false"));
+        audioConstraints.mandatory.add(
+                new MediaConstraints.KeyValuePair(AUDIO_NOISE_SUPPRESSION_CONSTRAINT, "true"));
+
+        audioSource = factory.createAudioSource(audioConstraints);
+        audioTrack = factory.createAudioTrack("AUDIO", audioSource);
+        audioTrack.setEnabled(true);
+    }
+
     //endregion
 
     //region Binding logic and methods
@@ -168,11 +202,11 @@ public class WebRTCService extends Service {
     }
 
     public void addSink(SurfaceViewRenderer surfaceView) {
-        track.addSink(surfaceView);
+        videoTrack.addSink(surfaceView);
     }
 
     public void removeSink(SurfaceViewRenderer surfaceView) {
-        track.removeSink(surfaceView);
+        videoTrack.removeSink(surfaceView);
     }
 
     public EglBase getEglBase() {

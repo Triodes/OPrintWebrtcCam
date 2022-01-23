@@ -6,10 +6,12 @@ import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.webrtc.AudioTrack;
 import org.webrtc.DataChannel;
 import org.webrtc.IceCandidate;
 import org.webrtc.MediaConstraints;
 import org.webrtc.MediaStream;
+import org.webrtc.MediaStreamTrack;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.RtpParameters;
@@ -22,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import fi.iki.elonen.NanoHTTPD;
@@ -32,13 +35,15 @@ class WebServer extends NanoHTTPD {
     private final String STREAM_ID = "OctoPrintStream";
     private final PeerConnectionFactory factory;
     private final Object lock = new Object();
-    private final VideoTrack track;
+    private final VideoTrack videoTrack;
+    private final AudioTrack audioTrack;
     private PeerConnection connection;
 
-    public WebServer(PeerConnectionFactory factory, VideoTrack track) {
+    public WebServer(PeerConnectionFactory factory, VideoTrack videoTrack, AudioTrack audioTrack) {
         super(8080);
         this.factory = factory;
-        this.track = track;
+        this.videoTrack = videoTrack;
+        this.audioTrack = audioTrack;
     }
 
     public void start() throws IOException {
@@ -93,8 +98,10 @@ class WebServer extends NanoHTTPD {
         this.stop();
         if (connection != null)
             connection.dispose();
-        else
-            track.dispose();
+        else {
+            videoTrack.dispose();
+            audioTrack.dispose();
+        }
     }
 
     private Response doAnswer() {
@@ -159,6 +166,7 @@ class WebServer extends NanoHTTPD {
                 Log.d(TAG, "onIceConnectionChange: " + iceConnectionState.name());
                 if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
                     setVideoMaxBitrate();
+                    setAudioMaxBitrate();
                 }
             }
 
@@ -220,12 +228,21 @@ class WebServer extends NanoHTTPD {
 
         PeerConnection peerConnection = factory.createPeerConnection(iceServers, pcObserver);
         assert peerConnection != null;
-        peerConnection.addTrack(track, Collections.singletonList(STREAM_ID));
+        List<String> streamIds = Collections.singletonList(STREAM_ID);
+        peerConnection.addTrack(videoTrack, streamIds);
+        peerConnection.addTrack(audioTrack, streamIds);
         return peerConnection;
     }
 
     public void setVideoMaxBitrate() {
-        RtpSender localVideoSender = connection.getSenders().get(0);
+        RtpSender localVideoSender = null;
+        for (RtpSender sender : connection.getSenders()) {
+            if (sender.track().kind().equals(MediaStreamTrack.VIDEO_TRACK_KIND)) {
+                localVideoSender = sender;
+                break;
+            }            
+        }
+        
         int maxBitrateKbps = 4000;
 
         Log.d(TAG, "Requested max video bitrate: " + maxBitrateKbps);
@@ -246,6 +263,37 @@ class WebServer extends NanoHTTPD {
             Log.e(TAG, "RtpSender.setParameters failed.");
         }
         Log.d(TAG, "Configured max video bitrate to: " + maxBitrateKbps);
+    }
+
+    public void setAudioMaxBitrate() {
+        RtpSender localAudioSender = null;
+        for (RtpSender sender : connection.getSenders()) {
+            if (sender.track().kind().equals(MediaStreamTrack.AUDIO_TRACK_KIND)) {
+                localAudioSender = sender;
+                break;
+            }
+        }
+
+        int maxBitrateKbps = 40;
+
+        Log.d(TAG, "Requested max audio bitrate: " + maxBitrateKbps);
+        if (localAudioSender == null) {
+            Log.w(TAG, "Sender is not ready.");
+            return;
+        }
+        RtpParameters parameters = localAudioSender.getParameters();
+        if (parameters.encodings.size() == 0) {
+            Log.w(TAG, "RtpParameters are not ready.");
+            return;
+        }
+        for (RtpParameters.Encoding encoding : parameters.encodings) {
+            // Null value means no limit.
+            encoding.maxBitrateBps = maxBitrateKbps * 1000;
+        }
+        if (!localAudioSender.setParameters(parameters)) {
+            Log.e(TAG, "RtpSender.setParameters failed.");
+        }
+        Log.d(TAG, "Configured max audio bitrate to: " + maxBitrateKbps);
     }
 
     //region Response utility functions
