@@ -27,18 +27,14 @@ import org.webrtc.Camera1Session;
 import org.webrtc.Camera2Enumerator;
 import org.webrtc.Camera2Session;
 import org.webrtc.CameraEnumerator;
-import org.webrtc.DataChannel;
 import org.webrtc.DefaultVideoDecoderFactory;
 import org.webrtc.DefaultVideoEncoderFactory;
 import org.webrtc.EglBase;
-import org.webrtc.IceCandidate;
 import org.webrtc.MediaConstraints;
-import org.webrtc.MediaStream;
 import org.webrtc.MediaStreamTrack;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.RtpParameters;
-import org.webrtc.RtpReceiver;
 import org.webrtc.RtpSender;
 import org.webrtc.SessionDescription;
 import org.webrtc.SurfaceTextureHelper;
@@ -52,12 +48,10 @@ import org.webrtc.VideoTrack;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import fi.iki.elonen.NanoHTTPD;
 import nl.comptex.oprintwebrtccam.helpers.PeerConnectionObserver;
+import nl.comptex.oprintwebrtccam.helpers.WebServer;
 
 public class WebRTCService extends Service {
     private static final int ONGOING_NOTIFICATION_ID = 1337;
@@ -101,7 +95,11 @@ public class WebRTCService extends Service {
         createVideoStreamTrack();
         createAudioStreamTrack();
 
-        server = new WebServer();
+        server = new WebServer(sdp -> {
+            if (connection != null)
+                connection.close();
+            return  doAnswer(sdp);
+        });
     }
 
     @Override
@@ -410,90 +408,5 @@ public class WebRTCService extends Service {
                         .build();
 
         startForeground(ONGOING_NOTIFICATION_ID, notification);
-    }
-
-    private class WebServer extends NanoHTTPD {
-        private static final String TAG = "WEBSERVER";
-
-        public WebServer() {
-            super(8080);
-        }
-
-        public void start() throws IOException {
-            start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
-            Log.i(TAG, "Running! Point your browsers to http://<phone-ip>:8080/");
-        }
-
-        @Override
-        public Response serve(IHTTPSession session) {
-            if (session.getMethod() != Method.POST)
-                return goodRequest();
-
-            Map<String, String> files = new HashMap<>();
-            try {
-                session.parseBody(files);
-            } catch (IOException | ResponseException e) {
-                e.printStackTrace();
-                return badRequest();
-            }
-
-            String postData = files.get("postData");
-            if (postData == null)
-                return badRequest();
-
-            JSONObject obj;
-            try {
-                obj = new JSONObject(postData);
-            } catch (JSONException e) {
-                e.printStackTrace();
-                return badRequest();
-            }
-
-            try {
-                String sdp = obj.getString("sdp");
-                String type = obj.getString("type");
-                if (type.equals(OFFER.canonicalForm())) {
-                    Log.d(TAG, "Received offer");
-                    if (connection != null)
-                        connection.close();
-                    String result = doAnswer(sdp);
-                    if (result == null)
-                        return badRequest(Response.Status.INTERNAL_ERROR);
-                    else
-                        return goodRequest(result);
-                }
-                return badRequest();
-            } catch (JSONException e) {
-                e.printStackTrace();
-                return badRequest();
-            }
-        }
-
-        //region Response utility functions
-        private Response badRequest() {
-            return badRequest(Response.Status.BAD_REQUEST);
-        }
-
-        private Response badRequest(Response.Status statusCode) {
-            return addHeaders(newFixedLengthResponse(statusCode, MIME_PLAINTEXT + "; charset=UTF-8", ""));
-        }
-
-        private Response goodRequest() {
-            return goodRequest("{}");
-        }
-
-        private Response goodRequest(String json) {
-            return addHeaders(newFixedLengthResponse(Response.Status.OK, "application/json; charset=UTF-8", json));
-        }
-
-        private Response addHeaders(Response response) {
-            response.addHeader("Access-Control-Allow-Origin", "*");
-            response.addHeader("Access-Control-Max-Age", "3628800");
-            response.addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
-            response.addHeader("Access-Control-Allow-Headers", "*");
-
-            return response;
-        }
-        //endregion
     }
 }
