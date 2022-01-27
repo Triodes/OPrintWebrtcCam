@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="framerate_preference">framerate</string>
     <string name="camera_preference">camera</string>
     <string name="orientation_preference">orientation</string>
     <string name="resolution_preference">resolution</string>

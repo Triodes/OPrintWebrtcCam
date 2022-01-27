@@ -11,6 +11,4 @@
     <string name="orientation_title">Orientation</string>
     <string name="must_select_camera">You must select a camera to use!</string>
     <string name="framerate">Framerate</string>
-    <string name="framerate_preference">framerate</string>
-    <string name="camera_preference">camera</string>
 </resources>
