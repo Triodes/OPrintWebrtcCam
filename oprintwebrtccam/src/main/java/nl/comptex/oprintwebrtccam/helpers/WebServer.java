@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import fi.iki.elonen.NanoHTTPD;
+import fi.iki.elonen.NanoHTTPD.Response.Status;
 
 public class WebServer extends NanoHTTPD {
     private static final String TAG = "WEBSERVER";
@@ -29,14 +30,14 @@ public class WebServer extends NanoHTTPD {
     }
 
     @Override
-    public NanoHTTPD.Response serve(NanoHTTPD.IHTTPSession session) {
-        if (session.getMethod() != NanoHTTPD.Method.POST)
+    public Response serve(IHTTPSession session) {
+        if (Method.POST != session.getMethod())
             return goodRequest();
 
         Map<String, String> files = new HashMap<>();
         try {
             session.parseBody(files);
-        } catch (IOException | NanoHTTPD.ResponseException e) {
+        } catch (IOException | ResponseException e) {
             e.printStackTrace();
             return badRequest();
         }
@@ -60,7 +61,7 @@ public class WebServer extends NanoHTTPD {
                 Log.d(TAG, "Received offer");
                 String result = listener.onOffer(sdp);
                 if (result == null)
-                    return badRequest(NanoHTTPD.Response.Status.INTERNAL_ERROR);
+                    return badRequest(Status.INTERNAL_ERROR);
                 else
                     return goodRequest(result);
             }
@@ -72,23 +73,23 @@ public class WebServer extends NanoHTTPD {
     }
 
     //region Response utility functions
-    private NanoHTTPD.Response badRequest() {
-        return badRequest(NanoHTTPD.Response.Status.BAD_REQUEST);
+    private Response badRequest() {
+        return badRequest(Status.BAD_REQUEST);
     }
 
-    private NanoHTTPD.Response badRequest(NanoHTTPD.Response.Status statusCode) {
+    private Response badRequest(Status statusCode) {
         return addHeaders(newFixedLengthResponse(statusCode, MIME_PLAINTEXT + "; charset=UTF-8", ""));
     }
 
-    private NanoHTTPD.Response goodRequest() {
+    private Response goodRequest() {
         return goodRequest("{}");
     }
 
-    private NanoHTTPD.Response goodRequest(String json) {
-        return addHeaders(newFixedLengthResponse(NanoHTTPD.Response.Status.OK, "application/json; charset=UTF-8", json));
+    private Response goodRequest(String json) {
+        return addHeaders(newFixedLengthResponse(Status.OK, "application/json; charset=UTF-8", json));
     }
 
-    private NanoHTTPD.Response addHeaders(NanoHTTPD.Response response) {
+    private Response addHeaders(Response response) {
         response.addHeader("Access-Control-Allow-Origin", "*");
         response.addHeader("Access-Control-Max-Age", "3628800");
         response.addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
