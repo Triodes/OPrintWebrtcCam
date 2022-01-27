@@ -140,15 +140,15 @@ public class WebRTCService extends Service {
     private void getPreferences() {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-        cameraDeviceName = prefs.getString(cameraDeviceName, null);
+        cameraDeviceName = prefs.getString(getString(R.string.camera_preference), null);
 
-        orientation = Integer.parseInt(prefs.getString(this.getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
+        orientation = Integer.parseInt(prefs.getString(getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
 
-        String[] resolution = prefs.getString(this.getString(R.string.resolution_preference), "1920x1080").split("x");
+        String[] resolution = prefs.getString(getString(R.string.resolution_preference), "1920x1080").split("x");
         width = Integer.parseInt(resolution[0]);
         height = Integer.parseInt(resolution[1]);
 
-        framerate = prefs.getInt(this.getString(R.string.orientation_preference), 30);
+        framerate = prefs.getInt(getString(R.string.framerate_preference), 30);
     }
 
     //endregion
