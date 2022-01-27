@@ -4,6 +4,8 @@ import static org.webrtc.SessionDescription.Type.OFFER;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -31,8 +33,24 @@ public class WebServer extends NanoHTTPD {
 
     @Override
     public Response serve(IHTTPSession session) {
-        if (Method.POST != session.getMethod())
+        String uri = session.getUri();
+        switch (uri) {
+            case "/webcam":
+                return handleOfferRequest(session);
+            case "/snapshot":
+                return handleSnapshotRequest(session);
+            default:
+                return badRequest();
+        }
+    }
+
+    @NonNull
+    private Response handleOfferRequest(IHTTPSession session) {
+        if (session.getMethod() == Method.OPTIONS)
             return goodRequest();
+
+        if (session.getMethod() != Method.POST)
+            return badRequest();
 
         Map<String, String> files = new HashMap<>();
         try {
@@ -70,6 +88,14 @@ public class WebServer extends NanoHTTPD {
             e.printStackTrace();
             return badRequest();
         }
+    }
+
+    private Response handleSnapshotRequest(IHTTPSession session) {
+        Method method = session.getMethod();
+        if (method != Method.OPTIONS && method != Method.GET)
+            return badRequest();
+
+        return goodRequest();
     }
 
     //region Response utility functions
