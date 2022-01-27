@@ -18,6 +18,7 @@ import androidx.preference.PreferenceManager;
 import org.webrtc.EglBase;
 
 import nl.comptex.oprintwebrtccam.databinding.ActivityMainBinding;
+import nl.comptex.oprintwebrtccam.helpers.EglBaseSingleton;
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 
@@ -141,7 +142,7 @@ public class MainActivity extends AppCompatActivity {
         if (!bound)
             return;
         
-        EglBase eglBase = service.getEglBase();
+        EglBase eglBase = EglBaseSingleton.getEglBase();
         binding.surfaceView.init(eglBase.getEglBaseContext(), null);
         binding.surfaceView.setEnableHardwareScaler(true);
         binding.surfaceView.setMirror(service.isUsingFrontFacingCamera());

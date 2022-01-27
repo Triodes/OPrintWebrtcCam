@@ -50,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import nl.comptex.oprintwebrtccam.helpers.EglBaseSingleton;
 import nl.comptex.oprintwebrtccam.helpers.PeerConnectionObserver;
 import nl.comptex.oprintwebrtccam.helpers.WebServer;
 
@@ -64,7 +65,6 @@ public class WebRTCService extends Service {
 
     private WebServer server;
 
-    private EglBase eglBase;
     private PeerConnectionFactory factory;
     private SurfaceTextureHelper helper;
 
@@ -132,7 +132,7 @@ public class WebRTCService extends Service {
         audioSource.dispose();
         helper.dispose();
         factory.dispose();
-        eglBase.release();
+        EglBaseSingleton.release();
         isRunning = false;
         super.onDestroy();
     }
@@ -164,7 +164,7 @@ public class WebRTCService extends Service {
         Camera1Session.fixedRotation = angle;
         Camera2Session.fixedRotation = angle;
 
-        eglBase = EglBase.create();
+        EglBase eglBase = EglBaseSingleton.getEglBase();
 
         VideoEncoderFactory encoderFactory = new DefaultVideoEncoderFactory(eglBase.getEglBaseContext(), true, true);
         VideoDecoderFactory decoderFactory = new DefaultVideoDecoderFactory(eglBase.getEglBaseContext());
@@ -371,10 +371,6 @@ public class WebRTCService extends Service {
 
     public void removeSink(SurfaceViewRenderer surfaceView) {
         videoTrack.removeSink(surfaceView);
-    }
-
-    public EglBase getEglBase() {
-        return eglBase;
     }
 
     public boolean isUsingFrontFacingCamera() {
