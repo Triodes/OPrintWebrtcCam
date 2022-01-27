@@ -80,11 +80,7 @@ public class SettingsActivity extends AppCompatActivity {
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
             ListPreference pref = this.findPreference(this.getString(R.string.camera_preference));
             String[] cameras = CameraHelper.getCameras(this.getContext());
-            String[] displayCameras = Arrays.stream(cameras).map((String item) -> {
-                String[] sub = item.split(",");
-                return sub[0] + ',' + sub[1];
-            }).toArray(String[]::new);
-            pref.setEntries(displayCameras);
+            pref.setEntries(cameras);
             pref.setEntryValues(cameras);
             Log.d(TAG, "onCreatePreferences: break");
         }

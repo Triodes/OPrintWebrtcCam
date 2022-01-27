@@ -55,6 +55,11 @@ public class WebRTCService extends Service {
     private VideoTrack videoTrack;
     private AudioSource audioSource;
     private AudioTrack audioTrack;
+    private String cameraDeviceName;
+    private int orientation;
+    private int width;
+    private int height;
+    private int framerate;
 
     public WebRTCService() {
     }
@@ -63,17 +68,33 @@ public class WebRTCService extends Service {
 
     @Override
     public void onCreate() {
+        getPreferences();
+
         createVideoStreamTrack();
         createAudioStreamTrack();
 
         server = new WebServer(factory, videoTrack, audioTrack);
     }
 
+    private void getPreferences() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+
+        cameraDeviceName = prefs.getString(cameraDeviceName, null);
+
+        orientation = Integer.parseInt(prefs.getString(this.getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
+
+        String[] resolution = prefs.getString(this.getString(R.string.resolution_preference), "1920x1080").split("x");
+        width = Integer.parseInt(resolution[0]);
+        height = Integer.parseInt(resolution[1]);
+
+        framerate = prefs.getInt(this.getString(R.string.orientation_preference), 30);
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         createNotification();
 
-        capturer.startCapture(1920,1080, 30);
+        capturer.startCapture(width, height,framerate);
 
         try {
             if (!server.wasStarted())
@@ -108,8 +129,6 @@ public class WebRTCService extends Service {
                 .createInitializationOptions();
         PeerConnectionFactory.initialize(initOptions);
 
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        int orientation = Integer.parseInt(prefs.getString(this.getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
         int angle = getAngle(orientation);
         Camera1Session.fixedRotation = angle;
         Camera2Session.fixedRotation = angle;
@@ -127,7 +146,7 @@ public class WebRTCService extends Service {
         videoSource = factory.createVideoSource(false);
         videoTrack = factory.createVideoTrack("VIDEO", videoSource);
 
-        capturer = createVideoCapturer(prefs.getString(this.getString(R.string.camera_preference), null));
+        capturer = createVideoCapturer(cameraDeviceName);
         helper = SurfaceTextureHelper.create("THREAD", eglBase.getEglBaseContext());
         capturer.initialize(helper, this, videoSource.getCapturerObserver());
 

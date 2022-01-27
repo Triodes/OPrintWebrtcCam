@@ -149,11 +149,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void releaseSurfaceView() {
-        binding.surfaceView.release();
-
-        if (!bound) {
-            return;
+        if (binding != null)
+            binding.surfaceView.release();
+        if (bound) {
+            service.removeSink(binding.surfaceView);
         }
-        service.removeSink(binding.surfaceView);
     }
 }
