@@ -25,11 +25,11 @@
             app:useSimpleSummaryProvider="true" />
 
         <SeekBarPreference
-            app:defaultValue="30"
             app:key="@string/framerate_preference"
             app:title="@string/framerate"
-            app:min="1"
+            android:min="1"
             android:max="60"
+            android:defaultValue="30"
             app:showSeekBarValue="true" />
 
 
