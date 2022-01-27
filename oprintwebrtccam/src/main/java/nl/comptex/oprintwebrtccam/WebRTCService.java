@@ -1,6 +1,8 @@
 package nl.comptex.oprintwebrtccam;
 
 
+import static org.webrtc.SessionDescription.Type.OFFER;
+
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -12,9 +14,12 @@ import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.os.Binder;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.preference.PreferenceManager;
 
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
 import org.webrtc.Camera1Enumerator;
@@ -22,11 +27,20 @@ import org.webrtc.Camera1Session;
 import org.webrtc.Camera2Enumerator;
 import org.webrtc.Camera2Session;
 import org.webrtc.CameraEnumerator;
+import org.webrtc.DataChannel;
 import org.webrtc.DefaultVideoDecoderFactory;
 import org.webrtc.DefaultVideoEncoderFactory;
 import org.webrtc.EglBase;
+import org.webrtc.IceCandidate;
 import org.webrtc.MediaConstraints;
+import org.webrtc.MediaStream;
+import org.webrtc.MediaStreamTrack;
+import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
+import org.webrtc.RtpParameters;
+import org.webrtc.RtpReceiver;
+import org.webrtc.RtpSender;
+import org.webrtc.SessionDescription;
 import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.VideoCapturer;
@@ -36,18 +50,32 @@ import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import fi.iki.elonen.NanoHTTPD;
+import nl.comptex.oprintwebrtccam.helpers.PeerConnectionObserver;
 
 public class WebRTCService extends Service {
-    private boolean usingFrontFacingCamera;
     private static final int ONGOING_NOTIFICATION_ID = 1337;
     private static final String WEBRTC_CHANNEL = "webrtcchannel";
+    private static final String STREAM_ID = "OctoPrintStream";
+    private static final String TAG = "WebRTCService";
     private static boolean isRunning = false;
+
+    private boolean usingFrontFacingCamera;
 
     private WebServer server;
 
     private EglBase eglBase;
     private PeerConnectionFactory factory;
     private SurfaceTextureHelper helper;
+
+    private final Object lock = new Object();
+    private PeerConnection connection;
 
     private VideoCapturer capturer;
 
@@ -73,28 +101,14 @@ public class WebRTCService extends Service {
         createVideoStreamTrack();
         createAudioStreamTrack();
 
-        server = new WebServer(factory, videoTrack, audioTrack);
-    }
-
-    private void getPreferences() {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-
-        cameraDeviceName = prefs.getString(cameraDeviceName, null);
-
-        orientation = Integer.parseInt(prefs.getString(this.getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
-
-        String[] resolution = prefs.getString(this.getString(R.string.resolution_preference), "1920x1080").split("x");
-        width = Integer.parseInt(resolution[0]);
-        height = Integer.parseInt(resolution[1]);
-
-        framerate = prefs.getInt(this.getString(R.string.orientation_preference), 30);
+        server = new WebServer();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         createNotification();
 
-        capturer.startCapture(width, height,framerate);
+        capturer.startCapture(width, height, framerate);
 
         try {
             if (!server.wasStarted())
@@ -109,7 +123,12 @@ public class WebRTCService extends Service {
 
     @Override
     public void onDestroy() {
-        server.dispose();
+        if (connection != null) {
+            connection.dispose();
+        } else {
+            videoTrack.dispose();
+            audioTrack.dispose();
+        }
         capturer.dispose();
         videoSource.dispose();
         audioSource.dispose();
@@ -118,6 +137,20 @@ public class WebRTCService extends Service {
         eglBase.release();
         isRunning = false;
         super.onDestroy();
+    }
+
+    private void getPreferences() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+
+        cameraDeviceName = prefs.getString(cameraDeviceName, null);
+
+        orientation = Integer.parseInt(prefs.getString(this.getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
+
+        String[] resolution = prefs.getString(this.getString(R.string.resolution_preference), "1920x1080").split("x");
+        width = Integer.parseInt(resolution[0]);
+        height = Integer.parseInt(resolution[1]);
+
+        framerate = prefs.getInt(this.getString(R.string.orientation_preference), 30);
     }
 
     //endregion
@@ -199,6 +232,119 @@ public class WebRTCService extends Service {
         audioTrack.setEnabled(true);
     }
 
+    private void setMaxBitrate(String audioTrackKind, int maxBitrateKbps) {
+        RtpSender localSender = null;
+        for (RtpSender sender : connection.getSenders()) {
+            if (sender.track().kind().equals(audioTrackKind)) {
+                localSender = sender;
+                break;
+            }
+        }
+
+        Log.d(TAG, "Requested max audio bitrate: " + maxBitrateKbps);
+        if (localSender == null) {
+            Log.w(TAG, "Sender is not ready.");
+            return;
+        }
+        RtpParameters parameters = localSender.getParameters();
+        if (parameters.encodings.size() == 0) {
+            Log.w(TAG, "RtpParameters are not ready.");
+            return;
+        }
+        for (RtpParameters.Encoding encoding : parameters.encodings) {
+            // Null value means no limit.
+            encoding.maxBitrateBps = maxBitrateKbps * 1000;
+        }
+        if (!localSender.setParameters(parameters)) {
+            Log.e(TAG, "RtpSender.setParameters failed.");
+        }
+        Log.d(TAG, "Configured max bitrate for " + audioTrackKind + " to: " + maxBitrateKbps);
+    }
+
+
+    private String doAnswer(String offerSdp) {
+        MediaConstraints constraints = new MediaConstraints();
+        constraints.mandatory.add(
+                new MediaConstraints.KeyValuePair("maxWidth", "1920"));
+        constraints.mandatory.add(
+                new MediaConstraints.KeyValuePair("maxHeight", "1080"));
+        constraints.mandatory.add(
+                new MediaConstraints.KeyValuePair("maxFrameRate", "60"));
+
+        connection = createPeerConnection(factory);
+        connection.setRemoteDescription(new SimpleSdpObserver(), new SessionDescription(OFFER, offerSdp));
+
+        connection.createAnswer(new SimpleSdpObserver() {
+            @Override
+            public void onCreateSuccess(SessionDescription sessionDescription) {
+                connection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
+                Log.d(TAG, "Generated initial answer");
+            }
+        }, constraints);
+
+        synchronized (lock) {
+            try {
+                if (connection.iceGatheringState() != PeerConnection.IceGatheringState.COMPLETE) {
+                    Log.d(TAG, "Waiting for ICE to complete");
+                    lock.wait();
+                    Log.d(TAG, "ICE gathering completed, continuing");
+                } else {
+                    Log.d(TAG, "ICE gathering already complete, continuing");
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+
+        try {
+            JSONObject message = new JSONObject();
+            SessionDescription description = connection.getLocalDescription();
+            message.put("type", description.type.canonicalForm());
+            message.put("sdp", description.description);
+            Log.d(TAG, "Sending final answer");
+            return message.toString();
+        } catch (JSONException e) {
+            e.printStackTrace();
+            return null;
+        }
+
+    }
+
+    private PeerConnection createPeerConnection(PeerConnectionFactory factory) {
+        ArrayList<PeerConnection.IceServer> iceServers = new ArrayList<>();
+        String URL = "stun:stun.l.google.com:19302";
+        iceServers.add(PeerConnection.IceServer.builder(URL).createIceServer());
+
+        PeerConnection.Observer pcObserver = new PeerConnectionObserver() {
+            @Override
+            public void onIceConnectionChange(PeerConnection.IceConnectionState iceConnectionState) {
+                super.onIceConnectionChange(iceConnectionState);
+                if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
+                    setMaxBitrate(MediaStreamTrack.VIDEO_TRACK_KIND, 4000);
+                    setMaxBitrate(MediaStreamTrack.AUDIO_TRACK_KIND, 40);
+                }
+            }
+
+            public void onIceGatheringChange(PeerConnection.IceGatheringState iceGatheringState) {
+                super.onIceGatheringChange(iceGatheringState);
+                if (iceGatheringState == PeerConnection.IceGatheringState.COMPLETE) {
+                    synchronized (lock) {
+                        Log.d(TAG, "gathering complete, notifying...");
+                        lock.notify();
+                    }
+                }
+            }
+        };
+
+        PeerConnection peerConnection = factory.createPeerConnection(iceServers, pcObserver);
+        assert peerConnection != null;
+        List<String> streamIds = Collections.singletonList(STREAM_ID);
+        peerConnection.addTrack(videoTrack, streamIds);
+        peerConnection.addTrack(audioTrack, streamIds);
+        return peerConnection;
+    }
+
     //endregion
 
     //region Binding logic and methods
@@ -233,6 +379,14 @@ public class WebRTCService extends Service {
         return eglBase;
     }
 
+    public boolean isUsingFrontFacingCamera() {
+        return usingFrontFacingCamera;
+    }
+
+    public static boolean isIsRunning() {
+        return isRunning;
+    }
+
     //endregion
 
     public void createNotification() {
@@ -258,9 +412,88 @@ public class WebRTCService extends Service {
         startForeground(ONGOING_NOTIFICATION_ID, notification);
     }
 
-    public boolean isUsingFrontFacingCamera() {
-        return usingFrontFacingCamera;
-    }
+    private class WebServer extends NanoHTTPD {
+        private static final String TAG = "WEBSERVER";
 
-    public static boolean isIsRunning() { return isRunning; }
+        public WebServer() {
+            super(8080);
+        }
+
+        public void start() throws IOException {
+            start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
+            Log.i(TAG, "Running! Point your browsers to http://<phone-ip>:8080/");
+        }
+
+        @Override
+        public Response serve(IHTTPSession session) {
+            if (session.getMethod() != Method.POST)
+                return goodRequest();
+
+            Map<String, String> files = new HashMap<>();
+            try {
+                session.parseBody(files);
+            } catch (IOException | ResponseException e) {
+                e.printStackTrace();
+                return badRequest();
+            }
+
+            String postData = files.get("postData");
+            if (postData == null)
+                return badRequest();
+
+            JSONObject obj;
+            try {
+                obj = new JSONObject(postData);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                return badRequest();
+            }
+
+            try {
+                String sdp = obj.getString("sdp");
+                String type = obj.getString("type");
+                if (type.equals(OFFER.canonicalForm())) {
+                    Log.d(TAG, "Received offer");
+                    if (connection != null)
+                        connection.close();
+                    String result = doAnswer(sdp);
+                    if (result == null)
+                        return badRequest(Response.Status.INTERNAL_ERROR);
+                    else
+                        return goodRequest(result);
+                }
+                return badRequest();
+            } catch (JSONException e) {
+                e.printStackTrace();
+                return badRequest();
+            }
+        }
+
+        //region Response utility functions
+        private Response badRequest() {
+            return badRequest(Response.Status.BAD_REQUEST);
+        }
+
+        private Response badRequest(Response.Status statusCode) {
+            return addHeaders(newFixedLengthResponse(statusCode, MIME_PLAINTEXT + "; charset=UTF-8", ""));
+        }
+
+        private Response goodRequest() {
+            return goodRequest("{}");
+        }
+
+        private Response goodRequest(String json) {
+            return addHeaders(newFixedLengthResponse(Response.Status.OK, "application/json; charset=UTF-8", json));
+        }
+
+        private Response addHeaders(Response response) {
+            response.addHeader("Access-Control-Allow-Origin", "*");
+            response.addHeader("Access-Control-Max-Age", "3628800");
+            response.addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+            response.addHeader("Access-Control-Allow-Headers", "*");
+
+            return response;
+        }
+        //endregion
+    }
 }
