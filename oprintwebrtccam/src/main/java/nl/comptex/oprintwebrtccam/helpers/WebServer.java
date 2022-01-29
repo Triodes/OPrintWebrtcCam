@@ -2,6 +2,7 @@ package nl.comptex.oprintwebrtccam.helpers;
 
 import static org.webrtc.SessionDescription.Type.OFFER;
 
+import android.graphics.Bitmap;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -9,6 +10,7 @@ import androidx.annotation.NonNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,9 +21,9 @@ import fi.iki.elonen.NanoHTTPD.Response.Status;
 public class WebServer extends NanoHTTPD {
     private static final String TAG = "WEBSERVER";
 
-    private final OfferListener listener;
+    private final RequestListener listener;
 
-    public WebServer(OfferListener listener) {
+    public WebServer(RequestListener listener) {
         super(8080);
         this.listener = listener;
     }
@@ -95,7 +97,14 @@ public class WebServer extends NanoHTTPD {
         if (method != Method.OPTIONS && method != Method.GET)
             return badRequest();
 
-        return goodRequest();
+        byte[] image = listener.onSnapshot();
+
+        return newFixedLengthResponse(
+                Status.OK,
+                "image/jpg",
+                new ByteArrayInputStream(image),
+                image.length
+        );
     }
 
     //region Response utility functions
@@ -124,7 +133,9 @@ public class WebServer extends NanoHTTPD {
         return response;
     }
 
-    public interface OfferListener {
+    public interface RequestListener {
         String onOffer(String sdp);
+
+        byte[] onSnapshot();
     }
 }

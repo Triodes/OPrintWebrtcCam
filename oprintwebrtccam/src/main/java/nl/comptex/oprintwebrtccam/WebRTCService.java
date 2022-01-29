@@ -12,6 +12,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.graphics.Bitmap;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
@@ -52,6 +53,7 @@ import java.util.List;
 
 import nl.comptex.oprintwebrtccam.helpers.EglBaseSingleton;
 import nl.comptex.oprintwebrtccam.helpers.PeerConnectionObserver;
+import nl.comptex.oprintwebrtccam.helpers.SnapshotSink;
 import nl.comptex.oprintwebrtccam.helpers.WebServer;
 
 public class WebRTCService extends Service {
@@ -82,6 +84,7 @@ public class WebRTCService extends Service {
     private int width;
     private int height;
     private int framerate;
+    private SnapshotSink sink;
 
     public WebRTCService() {
     }
@@ -95,10 +98,18 @@ public class WebRTCService extends Service {
         createVideoStreamTrack();
         createAudioStreamTrack();
 
-        server = new WebServer(sdp -> {
-            if (connection != null)
-                connection.close();
-            return  doAnswer(sdp);
+        server = new WebServer(new WebServer.RequestListener() {
+            @Override
+            public String onOffer(String sdp) {
+                if (connection != null)
+                    connection.close();
+                return  doAnswer(sdp);
+            }
+
+            @Override
+            public byte[] onSnapshot() {
+                return sink.getSnapshot();
+            }
         });
     }
 
@@ -176,12 +187,15 @@ public class WebRTCService extends Service {
 
         videoSource = factory.createVideoSource(false);
         videoTrack = factory.createVideoTrack("VIDEO", videoSource);
+        videoTrack.setEnabled(true);
+
+        sink = new SnapshotSink();
+        videoTrack.addSink(sink);
 
         capturer = createVideoCapturer(cameraDeviceName);
         helper = SurfaceTextureHelper.create("THREAD", eglBase.getEglBaseContext());
         capturer.initialize(helper, this, videoSource.getCapturerObserver());
 
-        videoTrack.setEnabled(true);
     }
 
     private int getAngle(int orientation) {
