@@ -43,16 +43,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate");
+        Log.d(TAG, "onCreate: " + hashCode());
+
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        int orientation = Integer.parseInt(prefs.getString(this.getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
-        if (getRequestedOrientation() != orientation) {
-            setRequestedOrientation(orientation);
-            changingOrientation = true;
-            return;
-        } else {
-            changingOrientation = false;
-        }
+        int preferredOrientation = Integer.parseInt(prefs.getString(this.getString(R.string.orientation_preference), Integer.toString(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)));
+        setRequestedOrientation(preferredOrientation);
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -61,9 +56,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        Log.d(TAG, "onStart");
-        if (changingOrientation)
-            return;
+        Log.d(TAG, "onStart: " + hashCode());
 
         if (!EasyPermissions.hasPermissions(this, perms)) {
             EasyPermissions.requestPermissions(this, "Need some permissions", PERMISSION_REQUEST_CODE, perms);
@@ -76,22 +69,20 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onRestart() {
         super.onRestart();
-        Log.d(TAG, "onRestart");
-        if (changingOrientation)
-            return;
+        Log.d(TAG, "onRestart: " + hashCode());
         initAndBindSurfaceView();
     }
 
     @Override
     protected void onStop() {
-        Log.d(TAG, "onStop");
+        Log.d(TAG, "onStop: " + hashCode());
         releaseSurfaceView();
         super.onStop();
     }
 
     @Override
     protected void onDestroy() {
-        Log.d(TAG, "onDestroy");
+        Log.d(TAG, "onDestroy: " + hashCode());
         if (bound) {
             unbindService(connection);
             bound = false;
@@ -125,7 +116,8 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onServiceConnected(ComponentName className, IBinder binder) {
-            // We've bound to LocalService, cast the IBinder and get LocalService instance
+            if (MainActivity.this.isDestroyed())
+                return;
             WebRTCService.LocalBinder localBinder = (WebRTCService.LocalBinder) binder;
             service = localBinder.getService();
             bound = true;
@@ -139,6 +131,7 @@ public class MainActivity extends AppCompatActivity {
     };
 
     private void initAndBindSurfaceView() {
+        Log.d(TAG, "initAndBindSurfaceView: ");
         if (!bound)
             return;
         
@@ -150,8 +143,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void releaseSurfaceView() {
-        if (binding != null)
-            binding.surfaceView.release();
+        Log.d(TAG, "releaseSurfaceView: ");
+        binding.surfaceView.release();
         if (bound) {
             service.removeSink(binding.surfaceView);
         }

@@ -380,10 +380,12 @@ public class WebRTCService extends Service {
     }
 
     public void addSink(SurfaceViewRenderer surfaceView) {
+        Log.d(TAG, "addSink: " + surfaceView.hashCode());
         videoTrack.addSink(surfaceView);
     }
 
     public void removeSink(SurfaceViewRenderer surfaceView) {
+        Log.d(TAG, "removeSink: " + surfaceView.hashCode());
         videoTrack.removeSink(surfaceView);
     }
 
