@@ -12,7 +12,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
-import android.graphics.Bitmap;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
@@ -24,12 +23,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
-import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera1Session;
-import org.webrtc.Camera2Enumerator;
 import org.webrtc.Camera2Session;
-import org.webrtc.CameraEnumerationAndroid;
-import org.webrtc.CameraEnumerator;
 import org.webrtc.DefaultVideoDecoderFactory;
 import org.webrtc.DefaultVideoEncoderFactory;
 import org.webrtc.EglBase;
@@ -54,6 +49,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import nl.comptex.oprintwebrtccam.helpers.CameraHelper;
 import nl.comptex.oprintwebrtccam.helpers.EglBaseSingleton;
 import nl.comptex.oprintwebrtccam.helpers.PeerConnectionObserver;
 import nl.comptex.oprintwebrtccam.helpers.SnapshotSink;
@@ -106,7 +102,7 @@ public class WebRTCService extends Service {
             public String onOffer(String sdp) {
                 if (connection != null)
                     connection.close();
-                return  doAnswer(sdp);
+                return doAnswer(sdp);
             }
 
             @Override
@@ -135,6 +131,7 @@ public class WebRTCService extends Service {
 
     @Override
     public void onDestroy() {
+        server.stop();
         if (connection != null) {
             connection.dispose();
         } else {
@@ -216,14 +213,8 @@ public class WebRTCService extends Service {
     }
 
     private VideoCapturer createVideoCapturer(String deviceName) {
-        CameraEnumerator enumerator;
-        if (Camera2Enumerator.isSupported(this)) {
-            enumerator = new Camera2Enumerator(this);
-        } else {
-            enumerator = new Camera1Enumerator(true);
-        }
-        usingFrontFacingCamera = enumerator.isFrontFacing(deviceName);
-        return enumerator.createCapturer(deviceName, null);
+        usingFrontFacingCamera = CameraHelper.isFrontFacing(this, deviceName);
+        return CameraHelper.createCapturer(this, deviceName);
     }
 
     private static final String AUDIO_ECHO_CANCELLATION_CONSTRAINT = "googEchoCancellation";
@@ -247,16 +238,16 @@ public class WebRTCService extends Service {
         audioTrack.setEnabled(true);
     }
 
-    private void setMaxBitrate(String audioTrackKind, int maxBitrateKbps) {
+    private void setMaxBitrate(String trackKind, int maxBitrateKbps) {
         RtpSender localSender = null;
         for (RtpSender sender : connection.getSenders()) {
-            if (Objects.requireNonNull(sender.track()).kind().equals(audioTrackKind)) {
+            if (Objects.requireNonNull(sender.track()).kind().equals(trackKind)) {
                 localSender = sender;
                 break;
             }
         }
 
-        Log.d(TAG, "Requested max audio bitrate: " + maxBitrateKbps);
+        Log.d(TAG, "Requested max "+trackKind+" bitrate: " + maxBitrateKbps);
         if (localSender == null) {
             Log.w(TAG, "Sender is not ready.");
             return;
@@ -273,18 +264,12 @@ public class WebRTCService extends Service {
         if (!localSender.setParameters(parameters)) {
             Log.e(TAG, "RtpSender.setParameters failed.");
         }
-        Log.d(TAG, "Configured max bitrate for " + audioTrackKind + " to: " + maxBitrateKbps);
+        Log.d(TAG, "Configured max bitrate for " + trackKind + " to: " + maxBitrateKbps);
     }
 
 
     private String doAnswer(String offerSdp) {
         MediaConstraints constraints = new MediaConstraints();
-        constraints.mandatory.add(
-                new MediaConstraints.KeyValuePair("maxWidth", "1920"));
-        constraints.mandatory.add(
-                new MediaConstraints.KeyValuePair("maxHeight", "1080"));
-        constraints.mandatory.add(
-                new MediaConstraints.KeyValuePair("maxFrameRate", "60"));
 
         connection = createPeerConnection(factory);
         connection.setRemoteDescription(new SimpleSdpObserver(), new SessionDescription(OFFER, offerSdp));
@@ -330,6 +315,8 @@ public class WebRTCService extends Service {
         ArrayList<PeerConnection.IceServer> iceServers = new ArrayList<>();
         String URL = "stun:stun.l.google.com:19302";
         iceServers.add(PeerConnection.IceServer.builder(URL).createIceServer());
+        PeerConnection.RTCConfiguration config = new PeerConnection.RTCConfiguration(iceServers);
+        config.enableCpuOveruseDetection = false;
 
         PeerConnection.Observer pcObserver = new PeerConnectionObserver() {
             @Override
@@ -337,7 +324,7 @@ public class WebRTCService extends Service {
                 super.onIceConnectionChange(iceConnectionState);
                 if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
                     setMaxBitrate(MediaStreamTrack.VIDEO_TRACK_KIND, 4000);
-                    setMaxBitrate(MediaStreamTrack.AUDIO_TRACK_KIND, 40);
+//                    setMaxBitrate(MediaStreamTrack.AUDIO_TRACK_KIND, 40);
                 }
             }
 
@@ -352,7 +339,7 @@ public class WebRTCService extends Service {
             }
         };
 
-        PeerConnection peerConnection = factory.createPeerConnection(iceServers, pcObserver);
+        PeerConnection peerConnection = factory.createPeerConnection(config, pcObserver);
         assert peerConnection != null;
         List<String> streamIds = Collections.singletonList(STREAM_ID);
         peerConnection.addTrack(videoTrack, streamIds);

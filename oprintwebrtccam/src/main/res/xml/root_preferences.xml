@@ -2,12 +2,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory app:title="@string/messages_header">
-
-        <ListPreference
-            app:key="@string/camera_preference"
-            app:title="@string/camera_title"
-            app:useSimpleSummaryProvider="true" />
-
         <ListPreference
             app:defaultValue="0"
             app:key="@string/orientation_preference"
@@ -17,22 +11,19 @@
             app:entryValues="@array/orientation_entry_values"/>
 
         <ListPreference
-            app:defaultValue="1920x1080"
+            app:key="@string/camera_preference"
+            app:title="@string/camera_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <ListPreference
             app:key="@string/resolution_preference"
             app:title="@string/resolution_title"
-            app:entries="@array/resolutions"
-            app:entryValues="@array/resolutions"
             app:useSimpleSummaryProvider="true" />
 
         <SeekBarPreference
             app:key="@string/framerate_preference"
             app:title="@string/framerate"
-            android:min="1"
-            android:max="60"
-            android:defaultValue="30"
             app:showSeekBarValue="true" />
-
-
 
     </PreferenceCategory>
 
