@@ -17,6 +17,7 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
+import androidx.core.app.NotificationCompat;
 import androidx.preference.PreferenceManager;
 
 import org.json.JSONException;
@@ -27,6 +28,7 @@ import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera1Session;
 import org.webrtc.Camera2Enumerator;
 import org.webrtc.Camera2Session;
+import org.webrtc.CameraEnumerationAndroid;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.DefaultVideoDecoderFactory;
 import org.webrtc.DefaultVideoEncoderFactory;
@@ -50,6 +52,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import nl.comptex.oprintwebrtccam.helpers.EglBaseSingleton;
 import nl.comptex.oprintwebrtccam.helpers.PeerConnectionObserver;
@@ -247,7 +250,7 @@ public class WebRTCService extends Service {
     private void setMaxBitrate(String audioTrackKind, int maxBitrateKbps) {
         RtpSender localSender = null;
         for (RtpSender sender : connection.getSenders()) {
-            if (sender.track().kind().equals(audioTrackKind)) {
+            if (Objects.requireNonNull(sender.track()).kind().equals(audioTrackKind)) {
                 localSender = sender;
                 break;
             }
@@ -400,18 +403,28 @@ public class WebRTCService extends Service {
     //endregion
 
     public void createNotification() {
+        int mutabilityFlag;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            mutabilityFlag = PendingIntent.FLAG_IMMUTABLE;
+        } else {
+            mutabilityFlag = 0;
+        }
+
         PendingIntent onClickPendingIntent = PendingIntent.getActivity(
                 this,
                 0,
                 new Intent(this, MainActivity.class),
-                PendingIntent.FLAG_IMMUTABLE);
+                mutabilityFlag
+        );
 
-        NotificationChannel chan = new NotificationChannel(WEBRTC_CHANNEL, "WebRTC background", NotificationManager.IMPORTANCE_DEFAULT);
-        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        manager.createNotificationChannel(chan);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(WEBRTC_CHANNEL, "WebRTC background", NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            manager.createNotificationChannel(channel);
+        }
 
         Notification notification =
-                new Notification.Builder(this, WEBRTC_CHANNEL)
+                new NotificationCompat.Builder(this, WEBRTC_CHANNEL)
                         .setContentTitle("WebRTC camera")
                         .setContentText("Tap to return to app")
                         .setSmallIcon(R.drawable.videocamera)

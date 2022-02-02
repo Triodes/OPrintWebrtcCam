@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
@@ -27,10 +28,8 @@ public class MainActivity extends AppCompatActivity {
     public static final String TAG = "MAINACT";
     private Intent intent;
     private ActivityMainBinding binding;
-    ComponentName componentName;
     private final String[] perms = new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO};
     private final int PERMISSION_REQUEST_CODE = 125478;
-    boolean changingOrientation = false;
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -101,7 +100,13 @@ public class MainActivity extends AppCompatActivity {
     @AfterPermissionGranted(PERMISSION_REQUEST_CODE)
     private void startAndBindService() {
         intent = new Intent(this, WebRTCService.class);
-        componentName = startForegroundService(intent);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent);
+        } else {
+            startService(intent);
+        }
+
         if (!bound)
             bindService(intent, connection, Context.BIND_ABOVE_CLIENT);
         super.onStart();
