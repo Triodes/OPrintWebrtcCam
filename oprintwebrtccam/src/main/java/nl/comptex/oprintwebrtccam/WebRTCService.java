@@ -324,7 +324,7 @@ public class WebRTCService extends Service {
                 super.onIceConnectionChange(iceConnectionState);
                 if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
                     setMaxBitrate(MediaStreamTrack.VIDEO_TRACK_KIND, 4000);
-//                    setMaxBitrate(MediaStreamTrack.AUDIO_TRACK_KIND, 40);
+                    setMaxBitrate(MediaStreamTrack.AUDIO_TRACK_KIND, 40);
                 }
             }
 
