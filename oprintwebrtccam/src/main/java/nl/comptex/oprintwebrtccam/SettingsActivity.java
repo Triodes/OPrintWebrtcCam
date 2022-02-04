@@ -101,7 +101,7 @@ public class SettingsActivity extends AppCompatActivity {
             });
 
             findPreference(getString(R.string.resolution_preference)).setOnPreferenceChangeListener((preference, newValue) -> {
-                updateFrameRatePreference((String) newValue);
+                updateFrameRatePreference(cameraPref.getValue(), (String) newValue);
                 return true;
             });
         }
@@ -125,22 +125,22 @@ public class SettingsActivity extends AppCompatActivity {
             if (!resolutions.contains(resolutionPref.getValue())) {
                 resolutionPref.setValue(resolutions.get(resolutions.size() / 2));
             }
-            updateFrameRatePreference(resolutionPref.getValue());
+            updateFrameRatePreference(selectedCamera, resolutionPref.getValue());
         }
 
-        private void updateFrameRatePreference(String resolution) {
+        private void updateFrameRatePreference(String selectedCamera, String resolution) {
             String[] wh = resolution.split("x");
             int width = Integer.parseInt(wh[0]);
             int height = Integer.parseInt(wh[1]);
 
-            ListPreference selectedCamera = this.findPreference(getString(R.string.camera_preference));
-            List<CaptureFormat> captureFormats = CameraHelper.getSupportedFormats(this.getContext(), selectedCamera.getValue());
+            List<CaptureFormat> captureFormats = CameraHelper.getSupportedFormats(this.getContext(), selectedCamera);
 
             SeekBarPreference frameratePreference = findPreference(getString(R.string.framerate_preference));
             for (CaptureFormat format : captureFormats) {
                 if (format.width == width && format.height == height) {
                     frameratePreference.setMin(format.framerate.min/1000);
                     frameratePreference.setMax(format.framerate.max/1000);
+                    frameratePreference.setEnabled(frameratePreference.getMin() != frameratePreference.getMax());
                 }
             }
 

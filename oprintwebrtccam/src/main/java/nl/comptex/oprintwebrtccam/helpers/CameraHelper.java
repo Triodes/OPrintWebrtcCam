@@ -4,7 +4,6 @@ import android.content.Context;
 
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera2Enumerator;
-import org.webrtc.CameraEnumerationAndroid;
 import org.webrtc.CameraEnumerationAndroid.CaptureFormat;
 import org.webrtc.CameraEnumerator;
 import org.webrtc.CameraVideoCapturer;
