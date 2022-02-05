@@ -26,5 +26,11 @@
             app:showSeekBarValue="true" />
 
     </PreferenceCategory>
+    <PreferenceCategory app:title="@string/advanced_settings">
+        <SwitchPreference
+            app:defaultValue="false"
+            app:key="@string/preference_forceH264"
+            app:title="@string/enable_h264" />
+    </PreferenceCategory>
 
 </PreferenceScreen>

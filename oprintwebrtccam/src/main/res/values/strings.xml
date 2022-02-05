@@ -11,4 +11,6 @@
     <string name="orientation_title">Orientation</string>
     <string name="must_select_camera">You must select a camera to use!</string>
     <string name="framerate">Framerate</string>
+    <string name="advanced_settings">Advanced</string>
+    <string name="enable_h264">Enable H264 codec</string>
 </resources>

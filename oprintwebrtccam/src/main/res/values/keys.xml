@@ -4,4 +4,5 @@
     <string name="camera_preference">camera</string>
     <string name="orientation_preference">orientation</string>
     <string name="resolution_preference">resolution</string>
+    <string name="preference_forceH264">forceH264</string>
 </resources>
