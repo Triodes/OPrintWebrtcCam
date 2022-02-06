@@ -1,5 +1,6 @@
 package nl.comptex.oprintwebrtccam;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -22,24 +23,50 @@ import java.util.List;
 
 import nl.comptex.oprintwebrtccam.databinding.SettingsActivityBinding;
 import nl.comptex.oprintwebrtccam.helpers.CameraHelper;
+import pub.devrel.easypermissions.AfterPermissionGranted;
+import pub.devrel.easypermissions.EasyPermissions;
 
 public class SettingsActivity extends AppCompatActivity {
 
+    private final String[] perms = new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO};
+    private final int PERMISSION_REQUEST_CODE = 125478;
+    private Bundle savedInstanceState;
     SettingsActivityBinding binding;
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        // Forward results to EasyPermissions
+        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
+    }
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        this.savedInstanceState = savedInstanceState;
+        super.onCreate(this.savedInstanceState);
         if (WebRTCService.isIsRunning()) {
             Intent intent = new Intent(this, MainActivity.class);
             startActivity(intent);
             return;
         }
 
+        if (!EasyPermissions.hasPermissions(this, perms)) {
+            EasyPermissions.requestPermissions(this, "Need some permissions", PERMISSION_REQUEST_CODE, perms);
+            return;
+        }
+
+        initializeView();
+    }
+
+    @AfterPermissionGranted(PERMISSION_REQUEST_CODE)
+    private void initializeView() {
         binding = SettingsActivityBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         setSupportActionBar(binding.supportActionBar);
 
-        if (savedInstanceState == null) {
+        if (this.savedInstanceState == null) {
             getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.settings, new SettingsFragment())

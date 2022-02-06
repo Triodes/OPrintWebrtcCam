@@ -28,16 +28,6 @@ public class MainActivity extends AppCompatActivity {
     public static final String TAG = "MAINACT";
     private Intent intent;
     private ActivityMainBinding binding;
-    private final String[] perms = new String[]{Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO};
-    private final int PERMISSION_REQUEST_CODE = 125478;
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        // Forward results to EasyPermissions
-        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
-    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,11 +46,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         Log.d(TAG, "onStart: " + hashCode());
-
-        if (!EasyPermissions.hasPermissions(this, perms)) {
-            EasyPermissions.requestPermissions(this, "Need some permissions", PERMISSION_REQUEST_CODE, perms);
-            return;
-        }
 
         startAndBindService();
     }
@@ -97,7 +82,6 @@ public class MainActivity extends AppCompatActivity {
         super.onBackPressed();
     }
 
-    @AfterPermissionGranted(PERMISSION_REQUEST_CODE)
     private void startAndBindService() {
         intent = new Intent(this, WebRTCService.class);
 
