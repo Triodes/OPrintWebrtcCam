@@ -8,6 +8,8 @@ This app is completely experimental and by no means stable.
 * [ ] Allow multiple connections to be made
 * [ ] Correctly rotate snapshots
 
-### Stuff that may or may not be possible:
+### Other things I would like:
+* [ ] No cropping of preview (i.e. letterbox)
 * [ ] Focus control
 * [ ] Exposure control
+* [ ] Convert src to Kotlin

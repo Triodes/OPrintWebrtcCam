@@ -17,6 +17,7 @@ import org.webrtc.VideoEncoderFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class EncoderFactoryHelper {
@@ -38,12 +39,18 @@ public class EncoderFactoryHelper {
     @NonNull
     private static VideoEncoderFactory getVideoEncoderFactoryForMime(int width, int height, String[] mimeTypes, EglBase eglBase) throws IOException {
         MediaCodecList codecList = new MediaCodecList(MediaCodecList.REGULAR_CODECS);
+        MediaCodecInfo[] infos = codecList.getCodecInfos();
         ArrayList<Predicate<MediaCodecInfo>> predicates = new ArrayList<>(mimeTypes.length);
         for (String mime : mimeTypes) {
-            MediaFormat format = MediaFormat.createVideoFormat(mime, width, height);
-            MediaCodec codec = MediaCodec.createByCodecName(codecList.findEncoderForFormat(format));
-            final MediaCodecInfo info = codec.getCodecInfo();
-            predicates.add(mediaCodecInfo -> mediaCodecInfo.equals(info));
+            for (MediaCodecInfo info : infos) {
+                if (!info.isEncoder())
+                    continue;
+
+                if (Arrays.asList(info.getSupportedTypes()).contains(mime)) {
+                    Log.d(TAG, "getVideoEncoderFactoryForMime: " + info.getName());
+                    predicates.add(mediaCodecInfo -> mediaCodecInfo.equals(info));
+                }
+            }
         }
 
         return new HardwareVideoEncoderFactory(
