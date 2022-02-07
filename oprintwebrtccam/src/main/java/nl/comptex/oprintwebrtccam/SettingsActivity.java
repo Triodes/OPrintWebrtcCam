@@ -41,7 +41,7 @@ public class SettingsActivity extends AppCompatActivity {
         // Forward results to EasyPermissions
         EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
     }
-    
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         this.savedInstanceState = savedInstanceState;

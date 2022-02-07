@@ -127,8 +127,9 @@ public class WebServer extends NanoHTTPD {
     private Response addHeaders(Response response) {
         response.addHeader("Access-Control-Allow-Origin", "*");
         response.addHeader("Access-Control-Max-Age", "3628800");
-        response.addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+        response.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         response.addHeader("Access-Control-Allow-Headers", "*");
+        response.addHeader("Allow", "GET, POST, OPTIONS");
 
         return response;
     }
