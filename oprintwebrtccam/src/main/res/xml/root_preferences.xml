@@ -27,10 +27,13 @@
 
     </PreferenceCategory>
     <PreferenceCategory app:title="@string/advanced_settings">
-        <SwitchPreference
-            app:defaultValue="false"
-            app:key="@string/preference_forceH264"
-            app:title="@string/enable_h264" />
+        <MultiSelectListPreference
+            app:key="@string/preference_enabled_codecs"
+            app:title="@string/enabled_codecs"
+            app:entries="@array/codecs"
+            app:entryValues="@array/codecs"
+            app:defaultValue="@array/default_codecs"
+            app:summary="You can enable or disable specific codecs. They are listed in order of preference, which cannot be changed. To force a specific codec all the ones above it must be disabled."/>
     </PreferenceCategory>
 
 </PreferenceScreen>

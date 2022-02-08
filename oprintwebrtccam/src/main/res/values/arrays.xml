@@ -20,4 +20,14 @@
         <item>1024x576</item>
         <item>800x600</item>
     </string-array>
+    <string-array name="codecs">
+        <item>VP8</item>
+        <item>VP9</item>
+        <item>H264</item>
+        <item>AV1</item>
+    </string-array>
+    <string-array name="default_codecs">
+        <item>VP8</item>
+        <item>H264</item>
+    </string-array>
 </resources>

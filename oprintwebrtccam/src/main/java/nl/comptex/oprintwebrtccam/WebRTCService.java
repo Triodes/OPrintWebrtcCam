@@ -12,16 +12,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
-import android.media.MediaCodec;
-import android.media.MediaCodecInfo;
-import android.media.MediaCodecList;
-import android.media.MediaFormat;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 import androidx.preference.PreferenceManager;
 
@@ -32,14 +26,11 @@ import org.webrtc.AudioTrack;
 import org.webrtc.Camera1Session;
 import org.webrtc.Camera2Session;
 import org.webrtc.DefaultVideoDecoderFactory;
-import org.webrtc.DefaultVideoEncoderFactory;
 import org.webrtc.EglBase;
-import org.webrtc.HardwareVideoEncoderFactory;
 import org.webrtc.MediaConstraints;
 import org.webrtc.MediaStreamTrack;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
-import org.webrtc.Predicate;
 import org.webrtc.RtpParameters;
 import org.webrtc.RtpSender;
 import org.webrtc.SessionDescription;
@@ -54,13 +45,14 @@ import org.webrtc.VideoTrack;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 
+import nl.comptex.oprintwebrtccam.helpers.BaseVideoEncoderFactory;
 import nl.comptex.oprintwebrtccam.helpers.CameraHelper;
 import nl.comptex.oprintwebrtccam.helpers.EglBaseSingleton;
-import nl.comptex.oprintwebrtccam.helpers.EncoderFactoryHelper;
 import nl.comptex.oprintwebrtccam.helpers.PeerConnectionObserver;
 import nl.comptex.oprintwebrtccam.helpers.SnapshotSink;
 import nl.comptex.oprintwebrtccam.helpers.WebServer;
@@ -93,7 +85,7 @@ public class WebRTCService extends Service {
     private int width;
     private int height;
     private int framerate;
-    private boolean forceH264;
+    private Set<String> enabledCodecs;
     private SnapshotSink sink;
 
     public WebRTCService() {
@@ -172,7 +164,7 @@ public class WebRTCService extends Service {
 
         framerate = prefs.getInt(getString(R.string.framerate_preference), 30);
 
-        forceH264 = prefs.getBoolean(getString(R.string.preference_forceH264), false);
+        enabledCodecs = prefs.getStringSet(getString(R.string.preference_enabled_codecs), new HashSet<>());
     }
 
     //endregion
@@ -190,7 +182,7 @@ public class WebRTCService extends Service {
 
         EglBase eglBase = EglBaseSingleton.getEglBase();
 
-        VideoEncoderFactory encoderFactory = EncoderFactoryHelper.getVideoEncoderFactory(width, height, forceH264, eglBase);
+        VideoEncoderFactory encoderFactory = new BaseVideoEncoderFactory(eglBase.getEglBaseContext(), enabledCodecs);
 
         VideoDecoderFactory decoderFactory = new DefaultVideoDecoderFactory(eglBase.getEglBaseContext());
 
