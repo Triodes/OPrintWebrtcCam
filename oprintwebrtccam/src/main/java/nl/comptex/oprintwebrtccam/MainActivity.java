@@ -1,6 +1,5 @@
 package nl.comptex.oprintwebrtccam;
 
-import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -12,7 +11,6 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
@@ -20,8 +18,6 @@ import org.webrtc.EglBase;
 
 import nl.comptex.oprintwebrtccam.databinding.ActivityMainBinding;
 import nl.comptex.oprintwebrtccam.helpers.EglBaseSingleton;
-import pub.devrel.easypermissions.AfterPermissionGranted;
-import pub.devrel.easypermissions.EasyPermissions;
 
 public class MainActivity extends AppCompatActivity {
 

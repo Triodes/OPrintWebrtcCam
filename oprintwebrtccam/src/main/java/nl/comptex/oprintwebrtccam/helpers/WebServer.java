@@ -2,7 +2,6 @@ package nl.comptex.oprintwebrtccam.helpers;
 
 import static org.webrtc.SessionDescription.Type.OFFER;
 
-import android.graphics.Bitmap;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
