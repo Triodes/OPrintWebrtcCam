@@ -29,8 +29,12 @@ public class BaseVideoEncoderFactory extends DefaultVideoEncoderFactory {
     @Nullable
     @Override
     public VideoEncoder createEncoder(VideoCodecInfo info) {
-        Log.d(TAG, "Using encoder: " + info.name);
-        return super.createEncoder(info);
+        VideoEncoder encoder = super.createEncoder(info);
+        if (encoder == null)
+            return null;
+
+        Log.d(TAG, "Using hardware encoder: " + encoder.isHardwareEncoder());
+        return encoder;
     }
 
     @Override
